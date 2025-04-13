@@ -1,0 +1,4 @@
+defaults:
+  - base_config
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog

@@ -1,0 +1,36 @@
+[project]
+name = "nvbenjo"
+version = "0.1.0"
+authors = [{"name" = "lukas_jkl"}]
+description = "Benchmark utility for NVIDIA GPU's"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+  "pytorch-benchmark",
+  "torchvision",
+  "torchaudio",
+  "nvitop",
+  "psutil",
+  "py-cpuinfo",
+  "hydra-core",
+  "hydra_colorlog",
+  "nvidia-ml-py",
+  "pandas",
+  "seaborn",
+]
+[project.scripts]
+nvbenjo = "nvbenjo.cli:nvbenjo"
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "ipython",
+]
+[tool.setuptools]
+include-package-data = true
+[tool.setuptools.package-data]
+nvbenjo = ["conf/*.yml", "conf/*.yaml"]
+[tool.ruff]
+line-length = 120
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
