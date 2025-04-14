@@ -1,12 +1,15 @@
 import typing as ty
 from platform import uname
 from typing import Any, Dict
+import logging
 
 import pynvml
 from cpuinfo import get_cpu_info
 from psutil import cpu_count, cpu_freq, virtual_memory
 
 from nvbenjo.utils import format_num
+
+logger = logging.getLogger(__name__)
 
 
 def _get_architecture_name_from_version(version: int) -> str:
@@ -63,6 +66,11 @@ def get_system_info() -> Dict[str, Any]:
     sys = uname()
     cpu = get_cpu_info()
     svmem = virtual_memory()
+    try:
+        gpus = get_gpu_info()
+    except pynvml.NVMLError_LibraryNotFound:
+        logger.warning("NVIDIA driver not found")
+        gpus = {}
     return {
         "os": {"system": sys.system, "node": sys.node, "release": sys.release, "version": sys.version},
         "cpu": {
@@ -75,5 +83,5 @@ def get_system_info() -> Dict[str, Any]:
             "frequency": f"{(cpu_freq().max / 1000):.2f} GHz",
         },
         "memory": format_num(svmem.total, bytes=True),
-        "gpus": get_gpu_info(),
+        "gpus": gpus,
     }

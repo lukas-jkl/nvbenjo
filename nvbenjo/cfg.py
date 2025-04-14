@@ -1,5 +1,6 @@
 import typing as ty
 from dataclasses import dataclass, field
+from nvbenjo.utils import PrecisionType
 
 
 @dataclass
@@ -12,7 +13,7 @@ class ModelConfig:
     num_batches: int = 50
     batch_sizes: ty.Tuple[int] = (16, 32)
     device_indices: ty.Tuple[int] = (0,)
-    precisions: ty.Tuple[str] = ("fp32", "fp16", "amp")
+    precisions: ty.Tuple[PrecisionType] = (PrecisionType.FP32, PrecisionType.FP16, PrecisionType.AMP)
 
 
 @dataclass
@@ -33,3 +34,4 @@ class NvbandwithConfig:
 class BenchConfig:
     nvbenjo: NvbenjoConfig = field(default_factory=NvbenjoConfig)
     nvbandiwth: NvbandwithConfig = field(default_factory=NvbandwithConfig)
+    output_dir: ty.Optional[str] = None

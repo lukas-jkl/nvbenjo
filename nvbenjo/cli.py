@@ -28,7 +28,11 @@ def nvbenjo(cfg: BenchConfig):
 
 
 def run(cfg: BenchConfig) -> None:
-    output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    if cfg.output_dir is None:
+        output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    else:
+        output_dir = cfg.output_dir
+
     nvbenjo_cfg = cfg.nvbenjo
     raw_results = []
     human_readable_results = {}
@@ -45,7 +49,7 @@ def run(cfg: BenchConfig) -> None:
 
     with open(join(output_dir, "out.yaml"), "w") as f:
         yaml.dump(human_readable_results, f, width=1000.0)
-    raw_results.to_csv("out.csv")
+    raw_results.to_csv(join(output_dir, "out.csv"))
     with open(join(output_dir, "config.yaml"), "w") as f:
         f.write(OmegaConf.to_yaml(cfg))
 

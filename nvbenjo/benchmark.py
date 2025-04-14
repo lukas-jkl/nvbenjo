@@ -42,10 +42,6 @@ def get_model(type_or_path: str, device: torch.device, **kwargs) -> nn.Module:
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid path or one of {available_torchvision_models}")
 
 
-def get_model_parameters(model: nn.Module) -> int:
-    return sum(p.numel() for p in model.parameters())
-
-
 def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: torch.device):
     torch.cuda.reset_peak_memory_stats(device=device)
     # before_run_allocation = torch.cuda.memory_allocated(device=device)
@@ -157,7 +153,11 @@ def benchmark_model(model_cfg: ModelConfig) -> Tuple[pd.DataFrame, dict]:
             # already went oom for this precision with smaller batch size -> skip bigger one
             continue
         try:
-            device = torch.device(f"cuda:{device_idx}")
+            if torch.cuda.is_available():
+                device = torch.device(f"cuda:{device_idx}")
+            else:
+                logger.warning("CUDA is not available. Running on CPU.")
+                device = torch.device("cpu")
             iter_cfgs.set_description(f"Device {str(device)} | Batch Size: {batch_size} | Precision: {precision}")
 
             shape = tuple(batch_size if s == "B" else s for s in model_cfg.shape)
@@ -165,17 +165,22 @@ def benchmark_model(model_cfg: ModelConfig) -> Tuple[pd.DataFrame, dict]:
 
             model = get_model(model_cfg.type_or_path, device=device, **model_cfg.kwargs)
             if num_model_parameters is None:
-                num_model_parameters = get_model_parameters(model)
+                num_model_parameters = utils.get_model_parameters(model)
 
             batch, _ = dset[0]
 
             model, batch = utils.apply_non_amp_model_precision(model, batch, precision=precision)
             with utils.get_amp_ctxt_for_precision(precision=precision, device=device):
                 warm_up(model, batch, device, num_batches=model_cfg.num_warmup_batches)
-                memory_alloc = measure_memory_allocation(model, batch, device)
+                if device.type == "cuda":
+                    memory_alloc = measure_memory_allocation(model, batch, device)
+                else:
+                    memory_alloc = None
+
                 cur_raw_results, cur_human_readable_results = measure_repeated_inference_timing(
                     model, batch, device, precision=precision, num_runs=model_cfg.num_batches
                 )
+
             cur_raw_results["memory_bytes"] = memory_alloc
             cur_human_readable_results["memory"] = utils.format_num(memory_alloc, bytes=True)
 
