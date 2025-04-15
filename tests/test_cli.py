@@ -1,7 +1,7 @@
-from omegaconf import OmegaConf
 from nvbenjo.cli import run
 from hydra import compose, initialize
 import tempfile
+
 
 def test_basic():
     with initialize(version_base=None, config_path="conf"):

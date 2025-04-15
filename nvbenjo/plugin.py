@@ -4,6 +4,4 @@ from hydra.plugins.search_path_plugin import SearchPathPlugin
 
 class NvbenjoSearchPathPlugin(SearchPathPlugin):
     def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
-        search_path.append(
-            provider="nvbenjo-plugin", path="pkg://nvbenjo/conf"
-        )
+        search_path.append(provider="nvbenjo-plugin", path="pkg://nvbenjo/conf")
