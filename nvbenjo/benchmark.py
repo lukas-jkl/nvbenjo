@@ -186,7 +186,7 @@ def benchmark_model(model_cfg: ModelConfig) -> Tuple[pd.DataFrame, dict]:
 
             cur_raw_results["model"] = model_cfg.name
             cur_raw_results["batch_size"] = batch_size
-            cur_raw_results["precision"] = precision
+            cur_raw_results["precision"] = precision.value
             cur_raw_results["device_idx"] = device_idx
             human_readable_results[f"{model_cfg.name}_b{batch_size}_{precision}"] = cur_human_readable_results
             raw_results.append(cur_raw_results)

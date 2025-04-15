@@ -1,19 +1,18 @@
 import logging
+import os
+from importlib.resources import files
+from os.path import join
 
 import hydra
 import pandas as pd
 import yaml
+from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 from tqdm import tqdm
-from hydra.core.config_store import ConfigStore
-
-
-from nvbenjo.cfg import BenchConfig
-import os
-from os.path import join
 
 from nvbenjo.benchmark import benchmark_model
-from importlib.resources import files
+from nvbenjo.cfg import BenchConfig
+from nvbenjo.plot import visualize_results
 
 logger = logging.getLogger("nvbenjo")
 
@@ -52,6 +51,8 @@ def run(cfg: BenchConfig) -> None:
     raw_results.to_csv(join(output_dir, "out.csv"))
     with open(join(output_dir, "config.yaml"), "w") as f:
         f.write(OmegaConf.to_yaml(cfg))
+
+    visualize_results(raw_results, output_dir=output_dir)
 
 
 if __name__ == "__main__":
