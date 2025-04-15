@@ -5,18 +5,28 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "-cn", "small"
+            ]
+        },
+        {
             "name": "debug python test",
             "type": "debugpy",
             "request": "launch",
             "justMyCode": true,
             "console": "integratedTerminal",
-            "env": {
-            },
+            "env": {},
             "cwd": "${workspaceFolder}",
             "module": "pytest",
             "args": [
                 "tests/test_cli.py"
             ]
-        }
+        },
     ]
 }
