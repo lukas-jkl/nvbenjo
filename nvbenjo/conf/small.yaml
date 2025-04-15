@@ -20,3 +20,4 @@ nvbenjo:
         - 0
         precisions:
         - FP32
+        - FP16
