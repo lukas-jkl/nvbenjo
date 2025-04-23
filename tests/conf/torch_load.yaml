@@ -1,0 +1,28 @@
+defaults:
+  - base_config
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+nvbenjo:
+  enable: true
+  measure_memory: true
+  torch_profile: false
+  output_dir_name: null
+  models:
+  - name: dummytorchmodel
+    type_or_path: replaceme
+    kwargs: {}
+    shape:
+    - B
+    - 10
+    num_warmup_batches: 1
+    num_batches: 2
+    batch_sizes:
+    - 1
+    - 2
+    device_indices:
+    - 0
+    precisions:
+    - FP32
+nvbandiwth:
+  enable: false

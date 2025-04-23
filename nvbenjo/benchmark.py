@@ -33,7 +33,7 @@ class DummyDataset(Dataset):
 
 def get_model(type_or_path: str, device: torch.device, **kwargs) -> nn.Module:
     if os.path.isfile(type_or_path):
-        return torch.load(type_or_path, map_location=device)
+        return torch.load(type_or_path, map_location=device, weights_only=False)
 
     available_torchvision_models = torchvision.models.list_models()
     if type_or_path in available_torchvision_models:
@@ -68,7 +68,6 @@ def measure_repeated_inference_timing(
     model: nn.Module,
     sample: torch.Tensor,
     model_device: torch.device,
-    precision: str = "fp32",
     transfer_to_device_fn=torch.Tensor.to,
     num_runs: int = 100,
 ) -> dict:
@@ -178,7 +177,7 @@ def benchmark_model(model_cfg: ModelConfig) -> Tuple[pd.DataFrame, dict]:
                     memory_alloc = None
 
                 cur_raw_results, cur_human_readable_results = measure_repeated_inference_timing(
-                    model, batch, device, precision=precision, num_runs=model_cfg.num_batches
+                    model, batch, device, num_runs=model_cfg.num_batches
                 )
 
             cur_raw_results["memory_bytes"] = memory_alloc
