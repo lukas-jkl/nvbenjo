@@ -8,7 +8,15 @@ def test_get_system_info():
     assert "gpus" in system_info
     assert "os" in system_info
 
-    assert isinstance(system_info["gpus"], dict)
+    assert isinstance(system_info["gpus"], (dict, list))
+    if isinstance(system_info["gpus"], list):
+        for gpu in system_info["gpus"]:
+            assert isinstance(gpu, dict)
+            assert "name" in gpu
+            assert "architecture" in gpu
+            assert "memory" in gpu
+            assert "cuda_capability" in gpu
+            assert "driver" in gpu
 
     # check basic cpu info
     cpu_info = system_info["cpu"]
