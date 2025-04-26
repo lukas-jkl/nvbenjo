@@ -1,11 +1,15 @@
 from os.path import join
 from typing import List
-from tabulate import tabulate
+# from tabulate import tabulate
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from nvbenjo.utils import format_num, format_seconds
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
 
 
 def visualize_results(
@@ -27,30 +31,94 @@ def visualize_results(
                 plt.savefig(join(output_dir, f"{model}_{device_stem}{key}.png"))
 
 
+def print_system_info(system_info: dict):
+    text_color = "white"
+    console = Console()
+    os_info = system_info["os"]
+    os_string = os_info["system"].replace("Linux", "Linux 🐧")
+    cpu_info = system_info["cpu"]
+    gpu_infos = system_info["gpus"]
+    driver_version = set(gpu_info["driver"] for gpu_info in gpu_infos)
+    driver_version = driver_version.pop() if len(driver_version) == 1 else driver_version
+
+    title = Text("System Information", style="bold cyan")
+
+    content = Text()
+    content.append("\n")
+    content.append(f"💻️ {os_info['node']}\n", style="bold")
+    content.append("OS:   ", style="bold yellow")
+    content.append(f"{os_string} - {os_info['version']} ({os_info['release']})\n", style=text_color)
+    content.append("CPU:  ", style="bold magenta")
+    content.append(f"{cpu_info['model']} ({cpu_info['architecture']})\t", style=text_color)
+    content.append("Cores: ", style=f"{text_color} bold")
+    content.append(f"{cpu_info['cores']}\n", style=text_color)
+    content.append("GPUs", style="bold green")
+    content.append(f" (Driver {driver_version})\n", style="green")
+    for gpuinfo in gpu_infos:
+        content.append("   ", style="bold blue")
+        content.append(f"{gpuinfo['name']} @ {gpuinfo['clock_gpu']} ", style=text_color)
+        content.append(f"({gpuinfo['memory']} @ {gpuinfo['clock_mem']})", style=text_color)
+        content.append(f" - {gpuinfo['architecture']}\n", style=text_color)
+
+    console.print(Panel(content, title=title, border_style="blue", padding=(1, 4)))
+
+
 def print_results(
     results: pd.DataFrame,
 ):
-    print("\n")
+    console = Console()
+
+    console.print("\n")
     for model in results.model.unique():
         model_results = results[results.model == model]
         for device_idx in model_results.device_idx.unique():
-            print(f"Model: {model} Device: {device_idx}")
+            # Create a rich table for each model+device combination
+            table = Table(
+                title=f"Model: {model} on Device: {device_idx}",
+                show_header=True,
+                header_style="bold",
+                show_lines=True,
+                title_style="bold",
+            )
+
+            # Get grouped results
             device_results = model_results[model_results.device_idx == device_idx]
             device_results = device_results.groupby(["model", "precision", "batch_size"]).mean()
-            for column in device_results.columns:
-                if "time" in column:
-                    device_results[column] = device_results[column].apply(format_seconds)
-                elif "bytes" in column:
-                    device_results[column] = device_results[column].apply(format_num, bytes=True)
-                elif column == "device_idx":
-                    device_results[column] = device_results[column].apply(lambda x: f"{int(x)}")
-                else:
-                    device_results[column] = device_results[column]
-                print_result = device_results.reset_index()
+            print_result = device_results.reset_index()
 
-            print(
-                tabulate(
-                    print_result, headers=print_result.columns, showindex=False, tablefmt="fancy_grid", floatfmt=".3f"
-                )
-            )
-            print("\n")
+            # Format values for display
+            for column in print_result.columns:
+                if "time" in column:
+                    print_result[column] = print_result[column].apply(format_seconds)
+                elif "bytes" in column:
+                    print_result[column] = print_result[column].apply(format_num, bytes=True)
+                elif column == "device_idx":
+                    print_result[column] = print_result[column].apply(lambda x: f"{int(x)}")
+
+            # Add columns to the table
+            for col in print_result.columns:
+                # Set column styles based on data type
+                if col == "model":
+                    style = "bold green"
+                elif col == "precision":
+                    style = "bold blue"
+                elif col == "batch_size":
+                    style = "bold yellow"
+                elif "time" in col:
+                    style = "cyan"
+                elif "memory" in col:
+                    style = "red"
+                else:
+                    style = None
+
+                # Format column names for better display
+                display_name = col.replace("_", " ").title()
+                table.add_column(display_name, style=style, justify="right")
+
+            # Add rows to the table
+            for _, row in print_result.iterrows():
+                table.add_row(*[str(value) for value in row.values])
+
+            # Display the table in a panel
+            console.print(Panel(table, border_style="dim", padding=(1, 2)))
+            console.print("\n")

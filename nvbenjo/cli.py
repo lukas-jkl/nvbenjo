@@ -4,15 +4,14 @@ from importlib.resources import files
 from os.path import join
 
 import hydra
-import pandas as pd
 import yaml
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
-from tqdm import tqdm
 
-from nvbenjo.benchmark import benchmark_model
+from nvbenjo import plot
+from nvbenjo.benchmark import benchmark_models
 from nvbenjo.cfg import BenchConfig
-from nvbenjo.plot import visualize_results, print_results
+from nvbenjo.system_info import get_system_info
 
 logger = logging.getLogger("nvbenjo")
 
@@ -32,19 +31,10 @@ def run(cfg: BenchConfig) -> None:
         output_dir = cfg.output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-    nvbenjo_cfg = cfg.nvbenjo
-    raw_results = []
-    human_readable_results = {}
+    system_info = get_system_info()
+
     logger.info(f"Starting benchmark, output-dir {output_dir}")
-
-    model_iter = tqdm(nvbenjo_cfg.models, leave=True)
-    for model_cfg in model_iter:
-        model_iter.set_description(model_cfg.name)
-        model_raw_results, model_human_readable_results = benchmark_model(model_cfg)
-        raw_results.append(model_raw_results)
-        human_readable_results.update(model_human_readable_results)
-
-    raw_results = pd.concat(raw_results)
+    raw_results, human_readable_results = benchmark_models(cfg.nvbenjo.models)
 
     with open(join(output_dir, "out.yaml"), "w") as f:
         yaml.dump(human_readable_results, f, width=1000.0)
@@ -52,8 +42,9 @@ def run(cfg: BenchConfig) -> None:
     with open(join(output_dir, "config.yaml"), "w") as f:
         f.write(OmegaConf.to_yaml(cfg))
 
-    visualize_results(raw_results, output_dir=output_dir)
-    print_results(raw_results)
+    plot.print_system_info(system_info)
+    plot.visualize_results(raw_results, output_dir=output_dir)
+    plot.print_results(raw_results)
 
 
 if __name__ == "__main__":
