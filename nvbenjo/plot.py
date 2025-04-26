@@ -1,9 +1,11 @@
 from os.path import join
 from typing import List
+from tabulate import tabulate
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from nvbenjo.utils import format_num, format_seconds
 
 
 def visualize_results(
@@ -23,3 +25,32 @@ def visualize_results(
                 sns.catplot(data=model_device_results, x="model", y=key, hue=hue, col=col, kind=kind)
                 device_stem = f"{device_idx}_" if mult_devices else ""
                 plt.savefig(join(output_dir, f"{model}_{device_stem}{key}.png"))
+
+
+def print_results(
+    results: pd.DataFrame,
+):
+    print("\n")
+    for model in results.model.unique():
+        model_results = results[results.model == model]
+        for device_idx in model_results.device_idx.unique():
+            print(f"Model: {model} Device: {device_idx}")
+            device_results = model_results[model_results.device_idx == device_idx]
+            device_results = device_results.groupby(["model", "precision", "batch_size"]).mean()
+            for column in device_results.columns:
+                if "time" in column:
+                    device_results[column] = device_results[column].apply(format_seconds)
+                elif "bytes" in column:
+                    device_results[column] = device_results[column].apply(format_num, bytes=True)
+                elif column == "device_idx":
+                    device_results[column] = device_results[column].apply(lambda x: f"{int(x)}")
+                else:
+                    device_results[column] = device_results[column]
+                print_result = device_results.reset_index()
+
+            print(
+                tabulate(
+                    print_result, headers=print_result.columns, showindex=False, tablefmt="fancy_grid", floatfmt=".3f"
+                )
+            )
+            print("\n")

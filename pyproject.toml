@@ -17,6 +17,7 @@ dependencies = [
   "nvidia-ml-py",
   "pandas",
   "seaborn",
+  "tabulate"
 ]
 [project.scripts]
 nvbenjo = "nvbenjo.cli:nvbenjo"

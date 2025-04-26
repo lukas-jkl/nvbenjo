@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from nvbenjo.benchmark import benchmark_model
 from nvbenjo.cfg import BenchConfig
-from nvbenjo.plot import visualize_results
+from nvbenjo.plot import visualize_results, print_results
 
 logger = logging.getLogger("nvbenjo")
 
@@ -53,6 +53,7 @@ def run(cfg: BenchConfig) -> None:
         f.write(OmegaConf.to_yaml(cfg))
 
     visualize_results(raw_results, output_dir=output_dir)
+    print_results(raw_results)
 
 
 if __name__ == "__main__":
