@@ -20,7 +20,6 @@ cs = ConfigStore.instance()
 cs.store(name="base_config", node=BenchConfig)
 
 
-# @hydra.main(version_base=None, config_path="./conf", config_name="default")
 @hydra.main(version_base=None, config_path=os.path.join(files("nvbenjo").joinpath("conf")), config_name="default")
 def nvbenjo(cfg: BenchConfig):
     run(cfg)
@@ -31,6 +30,7 @@ def run(cfg: BenchConfig) -> None:
         output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     else:
         output_dir = cfg.output_dir
+        os.makedirs(output_dir, exist_ok=True)
 
     nvbenjo_cfg = cfg.nvbenjo
     raw_results = []

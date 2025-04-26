@@ -21,7 +21,6 @@ class NvbenjoConfig:
     enable: bool = True
     measure_memory: bool = True
     torch_profile: bool = False
-    output_dir_name: ty.Optional[str] = None
     models: ty.List[ModelConfig] = field(default_factory=lambda: [ModelConfig()])
 
 
