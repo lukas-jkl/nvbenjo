@@ -2,7 +2,6 @@ import itertools
 import logging
 import os
 import time
-from functools import partial
 from typing import Callable, Optional, Tuple
 
 import numpy as np
@@ -10,13 +9,13 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torchvision
-import yaml
 from rich import progress
 from rich.progress import Progress
 from torch.utils.data import Dataset
 
 import nvbenjo.utils as utils
 from nvbenjo.cfg import ModelConfig
+from nvbenjo import console
 
 logger = logging.getLogger(__name__)
 
@@ -120,49 +119,23 @@ def measure_repeated_inference_timing(
 
     results_raw = pd.DataFrame(results_raw)
 
-    human_readable_results = {}
-    for key in ["time_cpu_to_device", "time_inference", "time_device_to_cpu", "time_total"]:
-        s_per_batch = results_raw[key]
-        batches_per_s = 1.0 / s_per_batch
-        key = key.replace("time_", "", 1)
-        human_readable_results[key] = {
-            "batches_per_second": (
-                f"{utils.format_num(batches_per_s.mean())} +/- {utils.format_num(batches_per_s.std())} "
-                f" [{utils.format_num(batches_per_s.min())}, {utils.format_num(batches_per_s.max())}]"
-            ),
-            "batch_latency": (
-                f"{utils.format_seconds(s_per_batch.mean())} +/- {utils.format_seconds(s_per_batch.std())}"
-                f" [{utils.format_seconds(s_per_batch.min())}, {utils.format_seconds(s_per_batch.max())}]"
-            ),
-        }
-    logger.debug("\n" + yaml.dump(human_readable_results, width=1000) + "\n")
-    return results_raw, human_readable_results
+    return results_raw
 
 
 def benchmark_models(model_cfgs: list[ModelConfig]) -> Tuple[pd.DataFrame, dict]:
     with _get_progress_bar() as progress_bar:
         model_task = progress_bar.add_task("Benchmarking models", total=len(model_cfgs))
-        raw_results = []
-        human_readable_results = {}
+        results = []
 
         for model_cfg in model_cfgs:
             progress_bar.update(model_task, description=f"Benchmarking {model_cfg.name}")
-            model_raw_results, model_human_readable_results = benchmark_model(model_cfg, progress_bar)
-            raw_results.append(model_raw_results)
-            human_readable_results.update(model_human_readable_results)
+            model_results = benchmark_model(model_cfg, progress_bar)
+            results.append(model_results)
             progress_bar.advance(model_task)
 
-        raw_results = pd.concat(raw_results)
+        results = pd.concat(results)
 
-    return raw_results, human_readable_results
-
-
-def _get_device(device_idx: int) -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device(f"cuda:{device_idx}")
-    else:
-        logger.warning("CUDA is not available. Running on CPU.")
-        return torch.device("cpu")
+    return results
 
 
 def _get_progress_bar() -> Optional[Progress]:
@@ -170,12 +143,66 @@ def _get_progress_bar() -> Optional[Progress]:
         "[progress.description]{task.description}",
         progress.BarColumn(bar_width=80),
         "[progress.percentage]{task.completed}/{task.total}",
+        console=console,
     )
 
 
+def _run_warmup(
+    model: nn.Module,
+    batch: torch.Tensor,
+    device: torch.device,
+    num_warmup_batches: int,
+    progress_bar: Optional[Progress],
+):
+    try:
+        if progress_bar is not None:
+            warm_up_task = progress_bar.add_task("    Warm-up", total=num_warmup_batches)
+
+        for _ in range(num_warmup_batches):
+            _ = model(batch.to(device)).to("cpu")
+            if progress_bar is not None:
+                progress_bar.advance(warm_up_task)
+
+    finally:
+        if progress_bar is not None:
+            progress_bar.remove_task(warm_up_task)
+
+
+def _measure_timings(
+    model: nn.Module,
+    batch: torch.Tensor,
+    device: torch.device,
+    num_batches: int,
+    progress_bar: Optional[Progress],
+):
+    if progress_bar is not None:
+        measure_task = progress_bar.add_task(
+            "    Inference",
+            total=num_batches,
+        )
+
+    def progress_callback():
+        if progress_bar is not None:
+            progress_bar.advance(measure_task)
+        else:
+            pass
+
+    try:
+        cur_raw_results = measure_repeated_inference_timing(
+            model,
+            batch,
+            device,
+            num_runs=num_batches,
+            progress_callback=progress_callback,
+        )
+    finally:
+        if progress_bar is not None:
+            progress_bar.remove_task(measure_task)
+    return cur_raw_results
+
+
 def benchmark_model(model_cfg: ModelConfig, progress_bar=Optional[Progress]) -> Tuple[pd.DataFrame, dict]:
-    raw_results = []
-    human_readable_results = {}
+    results = []
     num_model_parameters = None
     precision_batch_oom = {}
 
@@ -183,6 +210,7 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar=Optional[Progress]) -> 
 
     if progress_bar is None:
         progress_bar = _get_progress_bar()
+    console = progress_bar.console
 
     iter_cfgs = list(itertools.product(*[model_cfg.device_indices, model_cfg.batch_sizes, model_cfg.precisions]))
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
@@ -192,7 +220,12 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar=Optional[Progress]) -> 
             progress_bar.advance(bench_task)
             continue
         try:
-            device = _get_device(device_idx)
+            if torch.cuda.is_available():
+                device = torch.device(f"cuda:{device_idx}")
+            else:
+                console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
+                device = torch.device("cpu")
+
             progress_bar.update(
                 bench_task, description=f"  Device {device} | batch-size: {batch_size} | {precision.name}"
             )
@@ -206,49 +239,25 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar=Optional[Progress]) -> 
 
             batch, _ = dset[0]
             model, batch = utils.apply_non_amp_model_precision(model, batch, precision=precision)
+
             with utils.get_amp_ctxt_for_precision(precision=precision, device=device):
-                warm_up_task = progress_bar.add_task("    Warm-up", total=model_cfg.num_warmup_batches)
-                for _ in range(model_cfg.num_warmup_batches):
-                    _ = model(batch.to(device)).to("cpu")
-                    progress_bar.advance(warm_up_task)
-                progress_bar.remove_task(warm_up_task)
-
+                _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
                 memory_alloc = measure_memory_allocation(model, batch, device)
+                cur_results = _measure_timings(model, batch, device, model_cfg.num_batches, progress_bar)
 
-                measure_task = progress_bar.add_task(
-                    "    Inference",
-                    total=model_cfg.num_batches,
-                )
-                cur_raw_results, cur_human_readable_results = measure_repeated_inference_timing(
-                    model,
-                    batch,
-                    device,
-                    num_runs=model_cfg.num_batches,
-                    progress_callback=partial(progress_bar.advance, measure_task),
-                )
-                progress_bar.remove_task(measure_task)
-
-            cur_raw_results["memory_bytes"] = memory_alloc
-            cur_raw_results["model"] = model_cfg.name
-            cur_raw_results["batch_size"] = batch_size
-            cur_raw_results["precision"] = precision.value
-            cur_raw_results["device_idx"] = device_idx
-            cur_human_readable_results["memory"] = utils.format_num(memory_alloc, bytes=True)
-            human_readable_results[f"{model_cfg.name}_b{batch_size}_{precision}"] = cur_human_readable_results
-            raw_results.append(cur_raw_results)
+            cur_results["memory_bytes"] = memory_alloc
+            cur_results["model"] = model_cfg.name
+            cur_results["batch_size"] = batch_size
+            cur_results["precision"] = precision.value
+            cur_results["device_idx"] = device_idx
+            results.append(cur_results)
         except torch.cuda.OutOfMemoryError:
-            # logger.info(f"Out of memory for batch size {batch_size} and precision {precision}")
+            console.print(
+                f"[red]Out of memory for batch size {batch_size} and precision {precision} on device {device_idx}[/red]"
+            )
             precision_batch_oom[precision] = batch_size
             continue
         finally:
-            try:
-                progress_bar.remove_task(warm_up_task)
-            except (NameError, KeyError):
-                pass
-            try:
-                progress_bar.remove_task(measure_task)
-            except (NameError, KeyError):
-                pass
             progress_bar.advance(bench_task)
 
-    return pd.concat(raw_results), human_readable_results
+    return pd.concat(results)

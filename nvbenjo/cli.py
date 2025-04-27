@@ -4,7 +4,6 @@ from importlib.resources import files
 from os.path import join
 
 import hydra
-import yaml
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 
@@ -12,8 +11,10 @@ from nvbenjo import plot
 from nvbenjo.benchmark import benchmark_models
 from nvbenjo.cfg import BenchConfig
 from nvbenjo.system_info import get_system_info
+from nvbenjo import console
+from rich.logging import RichHandler
 
-logger = logging.getLogger("nvbenjo")
+logger = logging.getLogger(__name__)
 
 cs = ConfigStore.instance()
 cs.store(name="base_config", node=BenchConfig)
@@ -25,6 +26,7 @@ def nvbenjo(cfg: BenchConfig):
 
 
 def run(cfg: BenchConfig) -> None:
+    logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
     if cfg.output_dir is None:
         output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     else:
@@ -34,17 +36,16 @@ def run(cfg: BenchConfig) -> None:
     system_info = get_system_info()
 
     logger.info(f"Starting benchmark, output-dir {output_dir}")
-    raw_results, human_readable_results = benchmark_models(cfg.nvbenjo.models)
+    results = benchmark_models(cfg.nvbenjo.models)
 
-    with open(join(output_dir, "out.yaml"), "w") as f:
-        yaml.dump(human_readable_results, f, width=1000.0)
-    raw_results.to_csv(join(output_dir, "out.csv"))
+    results.to_csv(join(output_dir, "out.csv"))
     with open(join(output_dir, "config.yaml"), "w") as f:
         f.write(OmegaConf.to_yaml(cfg))
 
     plot.print_system_info(system_info)
-    plot.visualize_results(raw_results, output_dir=output_dir)
-    plot.print_results(raw_results)
+    plot.visualize_results(results, output_dir=output_dir)
+    plot.print_results(results)
+    logger.info(f"Benchmark finished, output-dir {output_dir}")
 
 
 if __name__ == "__main__":

@@ -1,12 +1,11 @@
 from os.path import join
 from typing import List
-# from tabulate import tabulate
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from nvbenjo.utils import format_num, format_seconds
-from rich.console import Console
+from nvbenjo import console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
@@ -33,7 +32,6 @@ def visualize_results(
 
 def print_system_info(system_info: dict):
     text_color = "white"
-    console = Console()
     os_info = system_info["os"]
     os_string = os_info["system"].replace("Linux", "Linux 🐧")
     cpu_info = system_info["cpu"]
@@ -52,13 +50,17 @@ def print_system_info(system_info: dict):
     content.append(f"{cpu_info['model']} ({cpu_info['architecture']})\t", style=text_color)
     content.append("Cores: ", style=f"{text_color} bold")
     content.append(f"{cpu_info['cores']}\n", style=text_color)
+
     content.append("GPUs", style="bold green")
-    content.append(f" (Driver {driver_version})\n", style="green")
-    for gpuinfo in gpu_infos:
-        content.append("   ", style="bold blue")
-        content.append(f"{gpuinfo['name']} @ {gpuinfo['clock_gpu']} ", style=text_color)
-        content.append(f"({gpuinfo['memory']} @ {gpuinfo['clock_mem']})", style=text_color)
-        content.append(f" - {gpuinfo['architecture']}\n", style=text_color)
+    if len(gpu_infos) > 0:
+        content.append(f" (Driver {driver_version})\n", style="green")
+        for gpu_info in gpu_infos:
+            content.append("   ", style="bold blue")
+            content.append(f"{gpu_info['name']} @ {gpu_info['clock_gpu']} ", style=text_color)
+            content.append(f"({gpu_info['memory']} @ {gpu_info['clock_mem']})", style=text_color)
+            content.append(f" - {gpu_info['architecture']}\n", style=text_color)
+    else:
+        content.append("  None\n", style=text_color)
 
     console.print(Panel(content, title=title, border_style="blue", padding=(1, 4)))
 
@@ -66,8 +68,6 @@ def print_system_info(system_info: dict):
 def print_results(
     results: pd.DataFrame,
 ):
-    console = Console()
-
     console.print("\n")
     for model in results.model.unique():
         model_results = results[results.model == model]

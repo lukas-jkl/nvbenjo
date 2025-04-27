@@ -11,7 +11,6 @@ from nvbenjo.cli import run
 EXPECTED_OUTPUT_FILES = [
     "config.yaml",
     "out.csv",
-    "out.yaml",
 ]
 
 
