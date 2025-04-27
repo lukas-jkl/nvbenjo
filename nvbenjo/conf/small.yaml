@@ -15,8 +15,8 @@ nvbenjo:
         num_warmup_batches: 1
         num_batches: 2
         batch_sizes:
-        - 1
-        - 2
+        - 8
+        - 16
         device_indices:
         - 0
         precisions:
