@@ -27,7 +27,7 @@ def nvbenjo(cfg: BenchConfig):
 
 def run(cfg: BenchConfig) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
-    output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    output_dir = cfg.output_dir
 
     system_info = get_system_info()
 
