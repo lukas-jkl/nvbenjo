@@ -4,17 +4,24 @@ from typing import List
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from nvbenjo.utils import format_num, format_seconds
-from nvbenjo import console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
+
+from nvbenjo import console
+from nvbenjo.utils import format_num, format_seconds
 
 
 def visualize_results(
     results: pd.DataFrame,
     output_dir: str,
-    keys: List[str] = ["time_cpu_to_device", "time_inference", "time_device_to_cpu", "time_total", "memory_bytes"],
+    keys: List[str] = [
+        "time_cpu_to_device",
+        "time_device_to_cpu",
+        "time_inference",
+        "time_total_batch_normalized",
+        "memory_bytes",
+    ],
     hue="precision",
     col="batch_size",
     kind="bar",
@@ -104,6 +111,8 @@ def print_results(
                     style = "bold blue"
                 elif col == "batch_size":
                     style = "bold yellow"
+                elif col == "time_total_batch_normalized":
+                    style = "bold cyan"
                 elif "time" in col:
                     style = "cyan"
                 elif "memory" in col:

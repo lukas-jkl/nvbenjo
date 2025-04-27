@@ -27,7 +27,7 @@ def nvbenjo(cfg: BenchConfig):
 
 def run(cfg: BenchConfig) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
-    output_dir = cfg.output_dir
+    output_dir = os.path.abspath(cfg.output_dir)
 
     system_info = get_system_info()
 
@@ -41,7 +41,7 @@ def run(cfg: BenchConfig) -> None:
     plot.print_system_info(system_info)
     plot.visualize_results(results, output_dir=output_dir)
     plot.print_results(results)
-    logger.info(f"Benchmark finished, output-dir {output_dir}")
+    logger.info(f"Benchmark finished, outputs in: {output_dir}")
 
 
 if __name__ == "__main__":

@@ -112,6 +112,7 @@ def measure_repeated_inference_timing(
                 "time_inference": elapsed_on_device,
                 "time_device_to_cpu": stop_on_cpu - stop_on_device,
                 "time_total": stop_on_cpu - start_on_cpu,
+                "time_total_batch_normalized": (stop_on_cpu - start_on_cpu) / sample.shape[0],
             }
         )
         if progress_callback is not None:
