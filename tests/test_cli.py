@@ -48,6 +48,7 @@ def test_small_single():
             run(cfg)
             _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
 
+
 def test_duplicate_model_names():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as tmpdir:

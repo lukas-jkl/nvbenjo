@@ -98,7 +98,7 @@ def print_results(
                 if column == "time_total_batch_normalized":
                     top3 = print_result.time_total_batch_normalized.nsmallest(3).index
                     print_result[column] = print_result[column].apply(format_seconds)
-                    for i, emoji in enumerate(["🥇", "🥈", "🥉"][:len(top3)]):
+                    for i, emoji in enumerate(["🥇", "🥈", "🥉"][: len(top3)]):
                         print_result.loc[top3[i], column] = f"{emoji} {print_result.loc[top3[i], column]}"
                 elif "time" in column:
                     print_result[column] = print_result[column].apply(format_seconds)
