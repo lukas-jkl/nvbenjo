@@ -49,19 +49,24 @@ class DummyDataset(Dataset):
         return rnd, None
 
 
-def get_model(type_or_path: str, device: torch.device, **kwargs) -> nn.Module:
+def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> nn.Module:
     if os.path.isfile(type_or_path):
+        if verbose and console is not None:
+            console.print(f"Loading torch model {type_or_path}")
         return torch.load(type_or_path, map_location=device, weights_only=False)
 
     if type_or_path.startswith("huggingface:"):
-        logger.info("Attempting to load HuggingFace model")
+        type_or_path = type_or_path[len("huggingface:") :]
+        if verbose and console is not None:
+            console.print(f"Loading huggingface model {type_or_path}")
         from transformers import AutoModel
 
-        type_or_path = type_or_path[len("huggingface:") :]
         return AutoModel.from_pretrained(type_or_path).to(device)
 
     available_torchvision_models = torchvision.models.list_models()
     if type_or_path in available_torchvision_models:
+        if verbose and console is not None:
+            console.print(f"Loading torchvision model {type_or_path}")
         return torchvision.models.get_model(type_or_path, **kwargs).to(device)
     else:
         raise ValueError(
@@ -74,7 +79,7 @@ def get_model(type_or_path: str, device: torch.device, **kwargs) -> nn.Module:
         )
 
 
-def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: torch.device):
+def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: torch.device, iterations: int = 3):
     if device.type != "cuda":
         return None
     torch.cuda.reset_peak_memory_stats(device=device)
@@ -82,7 +87,8 @@ def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: tor
 
     batch = batch.to(device)
     model = model.to(device)
-    r = model(batch)
+    for i in range(iterations):
+        r = model(batch)
     _ = utils.transfer_to_device(r, to_device="cpu")
 
     logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
@@ -155,7 +161,18 @@ def measure_repeated_inference_timing(
     return results_raw
 
 
+def test_load_models(model_cfgs: list[ModelConfig]) -> None:
+    loaded_types = []
+    logger.info("Checking if models are valid and available")
+    for model_cfg in model_cfgs:
+        if model_cfg.type_or_path not in loaded_types:
+            _ = get_model(model_cfg.type_or_path, device="cpu", verbose=True, **model_cfg.kwargs)
+            loaded_types.append(model_cfg.type_or_path)
+
+
 def benchmark_models(model_cfgs: list[ModelConfig]) -> Tuple[pd.DataFrame, dict]:
+    test_load_models(model_cfgs)
+
     with _get_progress_bar() as progress_bar:
         model_task = progress_bar.add_task("Benchmarking models", total=len(model_cfgs))
         results = []
@@ -240,11 +257,10 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar=Optional[Progress]) -> 
     num_model_parameters = None
     precision_batch_oom = {}
 
-    model = get_model(model_cfg.type_or_path, device="cpu", **model_cfg.kwargs)
-
     if progress_bar is None:
         progress_bar = _get_progress_bar()
     console = progress_bar.console
+    model = get_model(model_cfg.type_or_path, device="cpu", console=console, **model_cfg.kwargs)
 
     iter_cfgs = list(itertools.product(*[model_cfg.device_indices, model_cfg.batch_sizes, model_cfg.precisions]))
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
