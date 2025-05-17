@@ -64,7 +64,10 @@ def get_model(type_or_path: str, device: torch.device, **kwargs) -> nn.Module:
     if type_or_path in available_torchvision_models:
         return torchvision.models.get_model(type_or_path, **kwargs).to(device)
     else:
-        raise ValueError(f"Invalid model {type_or_path}. Must be a valid path or one of {available_torchvision_models}")
+        raise ValueError((f"Invalid model {type_or_path}. Must be: \n"
+                          "- a valid path \n"
+                          "- a valid huggingface AutoModel (named 'huggingface:<model-name>')  \n"
+                          f"- or one of these available torchvision models: {available_torchvision_models}"))
 
 
 def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: torch.device):
