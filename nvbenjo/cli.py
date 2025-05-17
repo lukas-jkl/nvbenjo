@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 
 from nvbenjo import plot
 from nvbenjo.benchmark import benchmark_models
-from nvbenjo.cfg import BenchConfig
+from nvbenjo.cfg import BenchConfig, check_config
 from nvbenjo.system_info import get_system_info
 from nvbenjo import console
 from rich.logging import RichHandler
@@ -27,6 +27,7 @@ def nvbenjo(cfg: BenchConfig):
 
 def run(cfg: BenchConfig) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
+    check_config(cfg)
     output_dir = os.path.abspath(cfg.output_dir)
 
     system_info = get_system_info()

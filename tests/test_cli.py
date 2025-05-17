@@ -1,3 +1,4 @@
+import pytest
 import csv
 import os
 import tempfile
@@ -38,6 +39,14 @@ def test_basic():
             cfg = compose(config_name="default", overrides=[f"output_dir={tmpdir}"])
             run(cfg)
             _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
+
+
+def test_duplicate_model_names():
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = compose(config_name="duplicate_model_name", overrides=[f"output_dir={tmpdir}"])
+            with pytest.raises(ValueError):
+                run(cfg)
 
 
 class DummyModel(torch.nn.Module):

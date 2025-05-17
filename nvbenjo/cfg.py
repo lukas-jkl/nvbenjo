@@ -34,3 +34,11 @@ class BenchConfig:
     nvbenjo: NvbenjoConfig = field(default_factory=NvbenjoConfig)
     nvbandiwth: NvbandwithConfig = field(default_factory=NvbandwithConfig)
     output_dir: ty.Optional[str] = None
+
+
+def check_config(cfg: BenchConfig) -> None:
+    model_names = [model.name for model in cfg.nvbenjo.models]
+    duplicates = set([x for x in model_names if model_names.count(x) > 1])
+    if duplicates:
+        raise ValueError(f"Duplicate model names found: {duplicates}. Please ensure all model names are unique.")
+    return
