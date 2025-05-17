@@ -26,15 +26,16 @@ class NvbenjoConfig:
     models: ty.List[ModelConfig] = field(default_factory=lambda: [ModelConfig()])
 
 
-@dataclass
-class NvbandwithConfig:
-    enable: bool = False
+# TODO: implement running nvbandwith https://github.com/NVIDIA/nvbandwidth for testing cpu <-> gpu bandwith
+# @dataclass
+# class NvbandwithConfig:
+#     enable: bool = False
 
 
 @dataclass
 class BenchConfig:
     nvbenjo: NvbenjoConfig = field(default_factory=NvbenjoConfig)
-    nvbandiwth: NvbandwithConfig = field(default_factory=NvbandwithConfig)
+    # nvbandiwth: NvbandwithConfig = field(default_factory=NvbandwithConfig)
     output_dir: ty.Optional[str] = None
 
 
