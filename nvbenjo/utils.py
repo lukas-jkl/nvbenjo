@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from contextlib import AbstractContextManager, nullcontext
 from enum import Enum
 import typing as ty
@@ -86,7 +87,9 @@ def get_model_parameters(model: nn.Module) -> int:
 def transfer_to_device(result: any, to_device: torch.device):
     if hasattr(result, "to"):
         return result.to(to_device)
-    elif hasattr(result, "values"):
-        return {k: v.to(to_device) for k, v in result.items()}
+    if isinstance(result, Sequence):
+        return [transfer_to_device(ri, to_device=to_device) for ri in result]
+    elif hasattr(result, "items"):
+        return {k: transfer_to_device(v, to_device=to_device) for k, v in result.items()}
     else:
         raise ValueError(f"Unsupported result type: {type(result)} could not transfer to {to_device}")
