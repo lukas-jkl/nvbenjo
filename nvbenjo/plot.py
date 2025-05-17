@@ -114,7 +114,7 @@ def print_results(
                 elif col == "time_total_batch_normalized":
                     style = "bold cyan"
                 elif "time" in col:
-                    style = "cyan"
+                    style = None
                 elif "memory" in col:
                     style = "red"
                 else:
