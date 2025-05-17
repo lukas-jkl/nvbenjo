@@ -41,6 +41,13 @@ def test_basic():
             _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
 
 
+def test_small_single():
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = compose(config_name="small_single", overrides=[f"output_dir={tmpdir}"])
+            run(cfg)
+            _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
+
 def test_duplicate_model_names():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as tmpdir:
