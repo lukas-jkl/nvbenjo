@@ -13,6 +13,8 @@ class ModelConfig:
     num_batches: int = 50
     batch_sizes: ty.Tuple[int] = (16, 32)
     device_indices: ty.Tuple[int] = (0,)
+    input_min_max: ty.Optional[ty.Tuple[float, float]] = None
+    input_dtype: ty.Optional[str] = None
     precisions: ty.Tuple[PrecisionType] = (PrecisionType.FP32, PrecisionType.FP16, PrecisionType.AMP)
 
 

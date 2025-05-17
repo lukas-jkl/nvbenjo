@@ -1,0 +1,25 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  enable: true
+  measure_memory: true
+  torch_profile: false
+  models:
+  - name: dummytorchmodel
+    type_or_path: replaceme
+    kwargs: {}
+    shape:
+    - B
+    - 10
+    num_warmup_batches: 1
+    num_batches: 2
+    batch_sizes:
+    - 1
+    device_indices:
+    - 0
+    input_min_max: [0, 0.5]
+    input_dtype: float
+    precisions:
+    - FP32

@@ -1,5 +1,6 @@
 from contextlib import AbstractContextManager, nullcontext
 from enum import Enum
+import typing as ty
 
 import torch
 import torch.nn as nn
@@ -14,6 +15,7 @@ class PrecisionType(Enum):
     FP32 = "fp32"
     FP16 = "fp16"
     BFLOAT16 = "bfloat16"
+    LONG = "long"
 
 
 def format_num(num: int, bytes: bool = False) -> str:
@@ -59,16 +61,19 @@ def get_amp_ctxt_for_precision(precision: PrecisionType, device: torch.device) -
     return ctxt
 
 
-def apply_non_amp_model_precision(model: nn.Module, batch: torch.Tensor, precision: PrecisionType):
+def apply_non_amp_model_precision(model: nn.Module, batch: ty.Optional[torch.Tensor], precision: PrecisionType):
     if AMP_PREFIX not in precision.value:
         if precision == PrecisionType.FP16:
             model = model.half()
-            batch = batch.half()
+            if batch is not None:
+                batch = batch.half()
         elif precision == PrecisionType.BFLOAT16:
             model = model.bfloat16()
-            batch = batch.bfloat16()
+            if batch is not None:
+                batch = batch.bfloat16()
         else:
-            assert precision == PrecisionType.FP32
+            if precision != PrecisionType.FP32:
+                raise ValueError(f"Invalid precision type {precision}.")
         return model, batch
     else:
         return model, batch
@@ -76,3 +81,12 @@ def apply_non_amp_model_precision(model: nn.Module, batch: torch.Tensor, precisi
 
 def get_model_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
+
+
+def transfer_to_device(result: any, to_device: torch.device):
+    if hasattr(result, "to"):
+        return result.to(to_device)
+    elif hasattr(result, "values"):
+        return {k: v.to(to_device) for k, v in result.items()}
+    else:
+        raise ValueError(f"Unsupported result type: {type(result)} could not transfer to {to_device}")

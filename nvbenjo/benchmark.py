@@ -21,20 +21,44 @@ logger = logging.getLogger(__name__)
 
 
 class DummyDataset(Dataset):
-    def __init__(self, size, shape):
+    def __init__(self, size, shape, dtype, min_max):
         self.size = size
         self.shape = shape
+        self.min_max = min_max
+        self.dtype = dtype
 
     def __len__(self):
         return self.size
 
     def __getitem__(self, idx):
-        return torch.randn(self.shape), None
+        if self.min_max is not None:
+            min_val, max_val = self.min_max
+        else:
+            min_val, max_val = 0, 1
+
+        if self.dtype is None or any(s in self.dtype for s in ["float", "double"]):
+            dtype = self.dtype if self.dtype is not None else "float32"
+            diff = max_val - min_val
+            rnd = torch.randn(size=self.shape, dtype=getattr(torch, dtype))
+            rnd = rnd * diff + min_val
+        elif any(s in self.dtype for s in ["int", "long"]):
+            rnd = torch.randint(low=int(min_val), high=int(max_val), size=self.shape, dtype=getattr(torch, self.dtype))
+        else:
+            raise ValueError(f"Invalid dtype {self.dtype}. Must be one of int, long, float, double")
+
+        return rnd, None
 
 
 def get_model(type_or_path: str, device: torch.device, **kwargs) -> nn.Module:
     if os.path.isfile(type_or_path):
         return torch.load(type_or_path, map_location=device, weights_only=False)
+
+    if type_or_path.startswith("huggingface:"):
+        logger.info("Attempting to load HuggingFace model")
+        from transformers import AutoModel
+
+        type_or_path = type_or_path[len("huggingface:") :]
+        return AutoModel.from_pretrained(type_or_path).to(device)
 
     available_torchvision_models = torchvision.models.list_models()
     if type_or_path in available_torchvision_models:
@@ -51,7 +75,8 @@ def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: tor
 
     batch = batch.to(device)
     model = model.to(device)
-    _ = model(batch).to(device)
+    r = model(batch)
+    _ = utils.transfer_to_device(r, to_device="cpu")
 
     logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
 
@@ -65,7 +90,7 @@ def measure_repeated_inference_timing(
     model: nn.Module,
     sample: torch.Tensor,
     model_device: torch.device,
-    transfer_to_device_fn=torch.Tensor.to,
+    transfer_to_device_fn=utils.transfer_to_device,
     num_runs: int = 100,
     progress_callback: Optional[Callable] = None,
 ) -> dict:
@@ -160,7 +185,8 @@ def _run_warmup(
             warm_up_task = progress_bar.add_task("    Warm-up", total=num_warmup_batches)
 
         for _ in range(num_warmup_batches):
-            _ = model(batch.to(device)).to("cpu")
+            r = model(batch.to(device))
+            _ = utils.transfer_to_device(r, to_device="cpu")
             if progress_bar is not None:
                 progress_bar.advance(warm_up_task)
 
@@ -232,14 +258,23 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar=Optional[Progress]) -> 
             )
 
             shape = tuple(batch_size if s == "B" else s for s in model_cfg.shape)
-            dset = DummyDataset(size=model_cfg.num_batches + model_cfg.num_warmup_batches + 1, shape=shape)
+            dset = DummyDataset(
+                size=model_cfg.num_batches + model_cfg.num_warmup_batches + 1,
+                shape=shape,
+                dtype=model_cfg.input_dtype,
+                min_max=model_cfg.input_min_max,
+            )
+            batch, _ = dset[0]
 
             model = get_model(model_cfg.type_or_path, device=device, **model_cfg.kwargs)
             if num_model_parameters is None:
                 num_model_parameters = utils.get_model_parameters(model)
 
-            batch, _ = dset[0]
-            model, batch = utils.apply_non_amp_model_precision(model, batch, precision=precision)
+            # only apply precision to input if no precision is specified
+            if model_cfg.input_dtype:
+                model, _ = utils.apply_non_amp_model_precision(model, None, precision=precision)
+            else:
+                model, batch = utils.apply_non_amp_model_precision(model, batch, precision=precision)
 
             with utils.get_amp_ctxt_for_precision(precision=precision, device=device):
                 _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)

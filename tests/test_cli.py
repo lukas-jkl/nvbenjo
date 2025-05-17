@@ -49,6 +49,14 @@ def test_duplicate_model_names():
                 run(cfg)
 
 
+def test_min_max_input_type():
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg = compose(config_name="input_min_max", overrides=[f"output_dir={tmpdir}"])
+            with pytest.raises(ValueError):
+                run(cfg)
+
+
 class DummyModel(torch.nn.Module):
     def __init__(self):
         super(DummyModel, self).__init__()
