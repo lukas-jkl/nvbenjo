@@ -260,7 +260,7 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar=Optional[Progress]) -> 
     if progress_bar is None:
         progress_bar = _get_progress_bar()
     console = progress_bar.console
-    model = get_model(model_cfg.type_or_path, device="cpu", console=console, **model_cfg.kwargs)
+    model = get_model(model_cfg.type_or_path, device="cpu", **model_cfg.kwargs)
 
     iter_cfgs = list(itertools.product(*[model_cfg.device_indices, model_cfg.batch_sizes, model_cfg.precisions]))
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
