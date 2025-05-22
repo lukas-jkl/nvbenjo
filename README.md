@@ -23,6 +23,9 @@ nvbenjo 'nvbenjo.models=['\
 '   {name: "custommodel", type_or_path: "wide_resnet101_2", shape: ["B", 3, 224, 224], batch_sizes: [16, 32], precisions: [AMP, FP16]}'\
 ']'
 
+nvbenjo 'nvbenjo.models=['\
+'   {name: "efficientnet", type_or_path: "efficientnet_b0", shape: [["B", 3, 224, 224], ["B", 3, 224, 224]], batch_sizes: [16, 32], precisions: [FP32, FP16]},'\
+']'
 # or specify your own config
 nvbenjo -cn customconfig
 ```
