@@ -22,5 +22,3 @@ nvbenjo:
     - 0
     precisions:
     - FP32
-nvbandiwth:
-  enable: false
