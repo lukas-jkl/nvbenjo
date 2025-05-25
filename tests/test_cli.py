@@ -150,10 +150,10 @@ def test_torch_load_complex_multiinput():
                                 "num_batches": 2,
                                 "batch_sizes": [1, 2],
                                 "device_indices": [0],
-                                "precisions": ["FP32"],
+                                "precisions": ["FP32", "FP16", "AMP_FP16"],
                                 "shape": [
-                                    {"name": "x", "shape": ["B", 10], "dtype": "float", "min_max": [min, max]},
-                                    {"name": "y", "shape": ["B", 20], "dtype": "float", "min_max": [min, max]},
+                                    {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
+                                    {"name": "y", "shape": ["B", 20], "min_max": [min, max]},
                                 ],
                             }
                         ]
@@ -190,8 +190,8 @@ def test_torch_load_complex_invalid_multiinput():
                                 "device_indices": [0],
                                 "precisions": ["FP32"],
                                 "shape": [
-                                    {"name": "x", "shape": ["B", 10], "dtype": "float", "min_max": [max, max * 2]},
-                                    {"name": "y", "shape": ["B", 20], "dtype": "float", "min_max": [max, max * 2]},
+                                    {"name": "x", "shape": ["B", 10], "type": "float", "min_max": [max, max * 2]},
+                                    {"name": "y", "shape": ["B", 20], "type": "float", "min_max": [max, max * 2]},
                                 ],
                             }
                         ]

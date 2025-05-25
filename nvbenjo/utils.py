@@ -108,6 +108,8 @@ def apply_non_amp_model_precision(
             batch = tuple(_apply_batch_precision(b) for b in batch)
         elif isinstance(batch, dict):
             batch = {k: _apply_batch_precision(v) for k, v in batch.items()}
+        elif batch is None:
+            pass
         else:
             raise ValueError(f"Unsupported batch type: {type(batch)}. Must be a Tensor, Tuple, or Dict.")
 
@@ -177,6 +179,11 @@ def get_rnd_from_shape_s(
             for si in shape:
                 # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
                 name = si["name"]
+                if "dtype" in si:
+                    raise ValueError("The 'dtype' is not valid. Did you mean 'type'?")
+                for k in si.keys():
+                    if k not in ["name", "type", "shape", "min_max"]:
+                        raise ValueError(f"Invalid key {k} in shape definition {si}.")
                 if "type" in si:
                     set_individual_dtype = True
                 rnd_input[name] = _get_rnd(
