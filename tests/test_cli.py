@@ -1,3 +1,4 @@
+import omegaconf
 import pytest
 import csv
 import os
@@ -87,3 +88,121 @@ def test_torch_load():
                 )
                 run(cfg)
                 _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
+
+
+class DummyModelMultiInput(torch.nn.Module):
+    def __init__(self):
+        super(DummyModelMultiInput, self).__init__()
+        self.fc1 = torch.nn.Linear(10, 1)
+        self.fc2 = torch.nn.Linear(20, 1)
+
+    def forward(self, x, y):
+        return self.fc1(x) * self.fc2(y)
+
+
+def test_torch_load_multiinput():
+    model = DummyModelMultiInput()
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
+            torch.save(model, tmpfile)
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                cfg = compose(
+                    config_name="torch_load_multiinput",
+                    overrides=[
+                        f"output_dir={tmpoutdir}",
+                        f'nvbenjo.models.0.type_or_path="{tmpfile.name}"',
+                    ],
+                )
+                run(cfg)
+                _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
+
+
+class ComplexDummyModelMultiInput(torch.nn.Module):
+    def __init__(self, min, max):
+        super(ComplexDummyModelMultiInput, self).__init__()
+        self.fc1 = torch.nn.Linear(10, 1)
+        self.fc2 = torch.nn.Linear(20, 1)
+        self.min = min
+        self.max = max
+
+    def forward(self, x, y):
+        if torch.any(x < self.min) or torch.any(x > self.max):
+            raise ValueError(f"Input x contains values outside the range [{self.min}, {self.max}]")
+        return self.fc1(x) * self.fc2(y)
+
+
+def test_torch_load_complex_multiinput():
+    min = 12
+    max = 34
+    model = ComplexDummyModelMultiInput(min=min, max=max)
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
+            torch.save(model, tmpfile)
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                config_override = {
+                    "nvbenjo": {
+                        "models": [
+                            {
+                                "name": "dummytorchmodel",
+                                "type_or_path": tmpfile.name,
+                                "num_batches": 2,
+                                "batch_sizes": [1, 2],
+                                "device_indices": [0],
+                                "precisions": ["FP32"],
+                                "shape": [
+                                    {"name": "x", "shape": ["B", 10], "dtype": "float", "min_max": [min, max]},
+                                    {"name": "y", "shape": ["B", 20], "dtype": "float", "min_max": [min, max]},
+                                ],
+                            }
+                        ]
+                    }
+                }
+                cfg = compose(
+                    config_name="default",
+                    overrides=[
+                        f"output_dir={tmpoutdir}",
+                    ],
+                )
+                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                run(cfg)
+                _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
+
+
+def test_torch_load_complex_invalid_multiinput():
+    min = 0
+    max = 12
+    model = ComplexDummyModelMultiInput(min=min, max=max)
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
+            torch.save(model, tmpfile)
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                config_override = {
+                    "nvbenjo": {
+                        "models": [
+                            {
+                                "name": "dummytorchmodel",
+                                "type_or_path": tmpfile.name,
+                                "num_batches": 2,
+                                "batch_sizes": [1, 2],
+                                "device_indices": [0],
+                                "precisions": ["FP32"],
+                                "shape": [
+                                    {"name": "x", "shape": ["B", 10], "dtype": "float", "min_max": [max, max * 2]},
+                                    {"name": "y", "shape": ["B", 20], "dtype": "float", "min_max": [max, max * 2]},
+                                ],
+                            }
+                        ]
+                    }
+                }
+                cfg = compose(
+                    config_name="default",
+                    overrides=[
+                        f"output_dir={tmpoutdir}",
+                    ],
+                )
+                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                with pytest.raises(ValueError, match=f"Input x contains values outside the range \\[{min}, {max}\\]"):
+                    run(cfg)

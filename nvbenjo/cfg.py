@@ -11,10 +11,8 @@ class ModelConfig:
     shape: tuple = ("B", 3, 224, 224)
     num_warmup_batches: int = 5
     num_batches: int = 50
-    batch_sizes: ty.Tuple[int] = (16, 32)
+    batch_sizes: ty.Tuple = (16, 32)
     device_indices: ty.Tuple[int] = (0,)
-    input_min_max: ty.Optional[ty.Tuple[float, float]] = None
-    input_dtype: ty.Optional[str] = None
     precisions: ty.Tuple[PrecisionType] = (PrecisionType.FP32, PrecisionType.FP16, PrecisionType.AMP)
 
 

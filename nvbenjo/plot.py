@@ -35,6 +35,7 @@ def visualize_results(
                 sns.catplot(data=model_device_results, x="model", y=key, hue=hue, col=col, kind=kind)
                 device_stem = f"{device_idx}_" if mult_devices else ""
                 plt.savefig(join(output_dir, f"{model}_{device_stem}{key}.png"))
+                plt.close()
 
 
 def print_system_info(system_info: dict):

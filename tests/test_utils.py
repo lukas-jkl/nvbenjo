@@ -3,6 +3,8 @@ from contextlib import nullcontext
 import torch
 import torch.nn as nn
 
+import pytest
+
 from nvbenjo.utils import (
     PrecisionType,
     apply_non_amp_model_precision,
@@ -10,6 +12,8 @@ from nvbenjo.utils import (
     format_seconds,
     get_amp_ctxt_for_precision,
     get_model_parameters,
+    get_rnd_from_shape_s,
+    EXAMPLE_VALID_SHAPES,
 )
 
 
@@ -87,3 +91,53 @@ def test_get_amp_ctxt_for_precision():
 
     ctxt = get_amp_ctxt_for_precision(PrecisionType.FP32, torch.device("cpu"))
     assert isinstance(ctxt, nullcontext)
+
+
+def test_get_rnd_shape_examples():
+    for example_shape in EXAMPLE_VALID_SHAPES:
+        _ = get_rnd_from_shape_s(example_shape, batch_size=12)
+
+
+def test_get_rnd_shape_invalid():
+    example_shape = ("B", 3, 224, 224)
+    with pytest.raises(ValueError):
+        _ = get_rnd_from_shape_s(example_shape, batch_size=12, min_val=0, max_val=1, dtype="invalid_dtype")
+    with pytest.raises(ValueError):
+        _ = get_rnd_from_shape_s(example_shape, batch_size=12, min_val="invalid", max_val=1)
+    with pytest.raises(ValueError):
+        _ = get_rnd_from_shape_s(example_shape, batch_size=12, min_val=0, max_val="invalid")
+    with pytest.raises(ValueError):
+        _ = get_rnd_from_shape_s((1, 3, 224, 224), batch_size=12)  # missing batch size identifier
+
+
+def test_get_rnd_shape_valid():
+    example_shape = ("B", 3, 224, 224)
+    rnd_tensor, set_individual_dtype = get_rnd_from_shape_s(
+        example_shape, batch_size=12, min_val=0, max_val=1, dtype="float32"
+    )
+    assert torch.all(rnd_tensor >= 0) and torch.all(rnd_tensor <= 1)
+    assert not set_individual_dtype
+    assert rnd_tensor.shape == (12, 3, 224, 224)
+    assert rnd_tensor.dtype == torch.float32
+
+    rnd_tensor, _ = get_rnd_from_shape_s(example_shape, batch_size=12, min_val=0, max_val=1, dtype="int32")
+    assert rnd_tensor.shape == (12, 3, 224, 224)
+    assert rnd_tensor.dtype == torch.int32
+
+    example_shape = (("B", 3, 224, 224), (1, 3, 12, 13))
+    rnd_tensor, _ = get_rnd_from_shape_s(example_shape, batch_size=12, min_val=0, max_val=1, dtype="float32")
+    assert rnd_tensor[0].shape == (12, 3, 224, 224)
+    assert rnd_tensor[1].shape == (1, 3, 12, 13)
+
+    example_shape = (
+        {"name": "input1", "type": "float", "shape": ("B", 3, 224, 224), "min_max": (3, 12)},
+        {"name": "input2", "type": "int", "shape": (1, 3), "min_max": (0, 1)},
+    )
+    rnd_tensor, set_individual_dtype = get_rnd_from_shape_s(example_shape, batch_size=12, dtype="float32")
+    assert set_individual_dtype
+    assert rnd_tensor["input1"].shape == (12, 3, 224, 224)
+    assert rnd_tensor["input1"].dtype == torch.float32
+    assert torch.all(rnd_tensor["input1"] >= 3) and torch.all(rnd_tensor["input1"] <= 12)
+    assert rnd_tensor["input2"].shape == (1, 3)
+    assert rnd_tensor["input2"].dtype == torch.int32
+    assert torch.all(rnd_tensor["input2"] >= 0) and torch.all(rnd_tensor["input2"] <= 1)

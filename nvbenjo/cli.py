@@ -2,10 +2,11 @@ import logging
 import os
 from importlib.resources import files
 from os.path import join
+import typing as ty
 
 import hydra
 from hydra.core.config_store import ConfigStore
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 from nvbenjo import plot
 from nvbenjo.benchmark import benchmark_models
@@ -21,11 +22,11 @@ cs.store(name="base_config", node=BenchConfig)
 
 
 @hydra.main(version_base=None, config_path=os.path.join(files("nvbenjo").joinpath("conf")), config_name="default")
-def nvbenjo(cfg: BenchConfig):
+def nvbenjo(cfg: ty.Union[BenchConfig, DictConfig]):
     run(cfg)
 
 
-def run(cfg: BenchConfig) -> None:
+def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
     check_config(cfg)
     output_dir = os.path.abspath(cfg.output_dir)
