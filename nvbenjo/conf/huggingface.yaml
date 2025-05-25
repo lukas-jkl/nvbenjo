@@ -7,33 +7,27 @@ nvbenjo:
       - name: bert
         type_or_path: huggingface:google-bert/bert-base-cased
         kwargs: {}
-        shape: [B, 200]
+        shape: [{"name": "input_ids", "shape": [B, 200], "type": "long", min_max: [0, 200]}]
         num_warmup_batches: 1
         num_batches: 2
         batch_sizes: [8, 16, 32]
         device_indices: [0]
-        input_dtype: long
-        input_min_max: [0, 200]
         precisions: [FP16, FP32, AMP_FP16]
       - name: gpt2
         type_or_path: huggingface:openai-community/gpt2
         kwargs: {}
-        shape: [B, 90]
+        shape: [{"name": "input_ids", "shape": [B, 90], "type": "long", min_max: [0, 200]}]
         num_warmup_batches: 5
         num_batches: 20
         batch_sizes: [16, 32]
         device_indices: [0]
-        input_dtype: long
-        input_min_max: [0, 200]
         precisions: [BFLOAT16, FP32]
       # - name: llama
       #   type_or_path: huggingface:openlm-research/open_llama_7b
       #   kwargs: {}
-      #   shape: [B, 90]
+      #   shape: [{"name": "input_ids", "shape": [B, 90], "type": "long", min_max: [0, 200]}]
       #   num_warmup_batches: 5
       #   num_batches: 20
       #   batch_sizes: [1, 2]
       #   device_indices: [0]
-      #   input_dtype: long
-      #   input_min_max: [0, 200]
       #   precisions: [BFLOAT16, FP32]

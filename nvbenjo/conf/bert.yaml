@@ -7,11 +7,9 @@ nvbenjo:
       - name: bert
         type_or_path: huggingface:google-bert/bert-base-cased
         kwargs: {}
-        shape: [B, 200]
+        shape: [{"name": "input_ids", "shape": [B, 200], "type": "long", min_max: [0, 200]}]
         num_warmup_batches: 1
         num_batches: 2
         batch_sizes: [1, 8]
         device_indices: [0]
-        input_dtype: long
-        input_min_max: [0, 200]
         precisions: [FP16, FP32, AMP_FP16]

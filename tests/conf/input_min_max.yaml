@@ -10,7 +10,7 @@ nvbenjo:
   - name: dummytorchmodel
     type_or_path: replaceme
     kwargs: {}
-    shape: [{"input_name": "x", "shape": ["B", 10], "dtype": "float", min_max: [0, 0.5]}]
+    shape: [{"name": "x", "shape": ["B", 10], "dtype": "float", min_max: [0, 0.5]}]
     num_warmup_batches: 1
     num_batches: 2
     batch_sizes:
