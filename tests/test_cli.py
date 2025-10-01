@@ -139,14 +139,31 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
         return self.fc1(x) * self.fc2(y)
 
 
-def test_torch_load_complex_multiinput():
+@pytest.mark.parametrize("export_type", ["torchexport", "torchsave", "torchscript"])
+def test_torch_load_complex_multiinput(export_type):
     min = 12
     max = 34
     model = ComplexDummyModelMultiInput(min=min, max=max)
 
     with initialize(version_base=None, config_path="conf"):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
-            torch.save(model, tmpfile)
+            if export_type == "torchsave":
+                torch.save(model, tmpfile)
+            elif export_type == "torchexport":
+                # for tochexport we need a model with simplified control flow
+                model = DummyModelMultiInput()
+                batch_size_dim = torch.export.Dim("B", min=1, max=1024)
+                program = torch.export.export(
+                    model, args=(torch.randn(2, 10), torch.randn(2, 20)),
+                    dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}}
+                )
+                torch.export.save(program, tmpfile)
+            elif export_type == "torchscript":
+                m = torch.jit.script(model)
+                torch.jit.save(m, tmpfile)
+            else:
+                raise ValueError(f"Unknown export_type {export_type}")
+
             with tempfile.TemporaryDirectory() as tmpoutdir:
                 config_override = {
                     "nvbenjo": {
@@ -166,6 +183,12 @@ def test_torch_load_complex_multiinput():
                         ]
                     }
                 }
+                if export_type == "torchexport":
+                    # torchexport does not work with named inputs
+                    config_override["nvbenjo"]["models"][0]["shape"] = [
+                        ["B", 10],
+                        ["B", 20],
+                    ]
                 cfg = compose(
                     config_name="default",
                     overrides=[

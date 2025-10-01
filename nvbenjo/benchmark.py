@@ -23,7 +23,13 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
     if os.path.isfile(type_or_path):
         if verbose and console is not None:
             console.print(f"Loading torch model {type_or_path}")
-        return torch.load(type_or_path, map_location=device, weights_only=False)
+        try:
+            return torch.load(type_or_path, map_location=device, weights_only=False)
+        except RuntimeError:
+            program = torch.export.load(type_or_path)
+            module = program.module()
+            module = module.to(device)
+            return module
 
     if type_or_path.startswith("huggingface:"):
         type_or_path = type_or_path[len("huggingface:") :]
