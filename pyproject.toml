@@ -6,7 +6,6 @@ description = "Benchmark utility for NVIDIA GPU's"
 readme = "README.md"
 requires-python = ">=3.9,<3.13"
 dependencies = [
-  "pytorch-benchmark",
   "torchvision",
   "torchaudio",
   "nvitop",
