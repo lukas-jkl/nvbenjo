@@ -26,6 +26,7 @@ dev = [
     "ruff",
     "ipython",
     "pytest",
+    "ty",
 ]
 [tool.setuptools]
 include-package-data = true

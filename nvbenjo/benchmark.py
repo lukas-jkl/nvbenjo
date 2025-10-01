@@ -29,7 +29,7 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
         type_or_path = type_or_path[len("huggingface:") :]
         if verbose and console is not None:
             console.print(f"Loading huggingface model {type_or_path}")
-        from transformers import AutoModel
+        from transformers import AutoModel  # type: ignore
 
         return AutoModel.from_pretrained(type_or_path).to(device)
 

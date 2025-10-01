@@ -29,19 +29,22 @@ def nvbenjo(cfg: ty.Union[BenchConfig, DictConfig]):
 def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
     check_config(cfg)
-    output_dir = os.path.abspath(cfg.output_dir)
+    if cfg.output_dir is not None:
+        output_dir = os.path.abspath(cfg.output_dir)
 
     system_info = get_system_info()
 
     logger.info(f"Starting benchmark, output-dir {output_dir}")
     results = benchmark_models(cfg.nvbenjo.models)
 
-    results.to_csv(join(output_dir, "out.csv"))
-    with open(join(output_dir, "config.yaml"), "w") as f:
-        f.write(OmegaConf.to_yaml(cfg))
+    if cfg.output_dir is not None:
+        results.to_csv(join(output_dir, "out.csv"))
+        with open(join(output_dir, "config.yaml"), "w") as f:
+            f.write(OmegaConf.to_yaml(cfg))
 
     plot.print_system_info(system_info)
-    plot.visualize_results(results, output_dir=output_dir)
+    if cfg.output_dir is not None:
+        plot.visualize_results(results, output_dir=output_dir)
     plot.print_results(results)
     logger.info(f"Benchmark finished, outputs in: {output_dir}")
 

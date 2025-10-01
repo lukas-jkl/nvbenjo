@@ -1,5 +1,7 @@
 import typing as ty
 from dataclasses import dataclass, field
+
+from omegaconf import DictConfig
 from nvbenjo.utils import PrecisionType
 
 
@@ -13,7 +15,7 @@ class ModelConfig:
     num_batches: int = 50
     batch_sizes: ty.Tuple = (16, 32)
     device_indices: ty.Tuple[int] = (0,)
-    precisions: ty.Tuple[PrecisionType] = (PrecisionType.FP32, PrecisionType.FP16, PrecisionType.AMP)
+    precisions: ty.Tuple[PrecisionType, ...] = (PrecisionType.FP32, PrecisionType.FP16, PrecisionType.AMP)
 
 
 @dataclass
@@ -37,7 +39,7 @@ class BenchConfig:
     output_dir: ty.Optional[str] = None
 
 
-def check_config(cfg: BenchConfig) -> None:
+def check_config(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     model_names = [model.name for model in cfg.nvbenjo.models]
     duplicates = set([x for x in model_names if model_names.count(x) > 1])
     if duplicates:

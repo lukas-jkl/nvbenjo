@@ -5,7 +5,7 @@ import logging
 
 import pynvml
 from cpuinfo import get_cpu_info
-from psutil import cpu_count, cpu_freq, virtual_memory
+import psutil
 
 from nvbenjo.utils import format_num
 
@@ -27,7 +27,7 @@ def _get_architecture_name_from_version(version: int) -> str:
     return f"Version {version} ({version_names.get(version, 'Unknown')})"
 
 
-def get_gpu_info() -> ty.List[ty.Dict[str, any]]:
+def get_gpu_info() -> ty.List[ty.Dict[str, Any]]:
     pynvml.nvmlInit()
     device_count = pynvml.nvmlDeviceGetCount()
     infos = []
@@ -65,22 +65,26 @@ def get_gpu_power_usage(device_index: int) -> float:
 def get_system_info() -> Dict[str, Any]:
     sys = uname()
     cpu = get_cpu_info()
-    svmem = virtual_memory()
+    svmem = psutil.virtual_memory()
     try:
         gpus = get_gpu_info()
-    except pynvml.NVMLError_LibraryNotFound:
+    except pynvml.NVMLError_LibraryNotFound:  # type: ignore
         logger.warning("NVIDIA driver not found")
         gpus = {}
+    if hasattr(psutil, "cpu_freq") and psutil.cpu_freq() is not None:
+        cpufreq = psutil.cpu_freq().max
+    else:
+        cpufreq = 0.0
     return {
         "os": {"system": sys.system, "node": sys.node, "release": sys.release, "version": sys.version},
         "cpu": {
             "model": cpu["brand_raw"],
             "architecture": cpu["arch_string_raw"],
             "cores": {
-                "physical": cpu_count(logical=False),
-                "total": cpu_count(logical=True),
+                "physical": psutil.cpu_count(logical=False),
+                "total": psutil.cpu_count(logical=True),
             },
-            "frequency": f"{(cpu_freq().max / 1000):.2f} GHz",
+            "frequency": f"{(cpufreq / 1000):.2f} GHz",
         },
         "memory": format_num(svmem.total, bytes=True),
         "gpus": gpus,

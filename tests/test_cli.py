@@ -16,6 +16,13 @@ EXPECTED_OUTPUT_FILES = [
 ]
 
 
+def run_config(cfg):
+    if isinstance(cfg, omegaconf.DictConfig):
+        run(cfg)
+    else:
+        raise ValueError("Config is not a DictConfig instance")
+
+
 def _check_files(directory, files):
     for file in files:
         assert os.path.exists(os.path.join(directory, file)), f"File {file} not found in {directory}"
@@ -38,7 +45,7 @@ def test_basic():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = compose(config_name="default", overrides=[f"output_dir={tmpdir}"])
-            run(cfg)
+            run_config(cfg)
             _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
 
 
@@ -46,7 +53,7 @@ def test_small_single():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = compose(config_name="small_single", overrides=[f"output_dir={tmpdir}"])
-            run(cfg)
+            run_config(cfg)
             _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
 
 
@@ -55,7 +62,7 @@ def test_duplicate_model_names():
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = compose(config_name="duplicate_model_name", overrides=[f"output_dir={tmpdir}"])
             with pytest.raises(ValueError):
-                run(cfg)
+                run_config(cfg)
 
 
 def test_min_max_input_type():
@@ -63,7 +70,7 @@ def test_min_max_input_type():
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = compose(config_name="input_min_max", overrides=[f"output_dir={tmpdir}"])
             with pytest.raises(ValueError):
-                run(cfg)
+                run_config(cfg)
 
 
 class DummyModel(torch.nn.Module):
@@ -86,7 +93,7 @@ def test_torch_load():
                     config_name="torch_load",
                     overrides=[f"output_dir={tmpoutdir}", f'nvbenjo.models.0.type_or_path="{tmpfile.name}"'],
                 )
-                run(cfg)
+                run_config(cfg)
                 _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
 
 
@@ -114,7 +121,7 @@ def test_torch_load_multiinput():
                         f'nvbenjo.models.0.type_or_path="{tmpfile.name}"',
                     ],
                 )
-                run(cfg)
+                run_config(cfg)
                 _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
 
 
@@ -166,7 +173,7 @@ def test_torch_load_complex_multiinput():
                     ],
                 )
                 cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
-                run(cfg)
+                run_config(cfg)
                 _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
 
 
@@ -204,5 +211,10 @@ def test_torch_load_complex_invalid_multiinput():
                     ],
                 )
                 cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
-                with pytest.raises(ValueError, match=f"Input x contains values outside the range \\[{min}, {max}\\]"):
-                    run(cfg)
+                if isinstance(cfg, omegaconf.DictConfig):
+                    with pytest.raises(
+                        ValueError, match=f"Input x contains values outside the range \\[{min}, {max}\\]"
+                    ):
+                        run_config(cfg)
+                else:
+                    raise ValueError("Config is not a DictConfig instance")
