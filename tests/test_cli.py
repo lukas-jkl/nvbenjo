@@ -154,8 +154,9 @@ def test_torch_load_complex_multiinput(export_type):
                 model = DummyModelMultiInput()
                 batch_size_dim = torch.export.Dim("B", min=1, max=1024)
                 program = torch.export.export(
-                    model, args=(torch.randn(2, 10), torch.randn(2, 20)),
-                    dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}}
+                    model,
+                    args=(torch.randn(2, 10), torch.randn(2, 20)),
+                    dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
                 )
                 torch.export.save(program, tmpfile)
             elif export_type == "torchscript":
@@ -241,3 +242,52 @@ def test_torch_load_complex_invalid_multiinput():
                         run_config(cfg)
                 else:
                     raise ValueError("Config is not a DictConfig instance")
+
+
+def test_onnx():
+    model = DummyModelMultiInput()
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".onnx") as tmpfile:
+            torch.onnx.export(
+                model,
+                args=(torch.randn(2, 10), torch.randn(2, 20)),
+                dynamic_axes={
+                    "x": {0: "batch_size"},  # First dimension of input 'x' is dynamic
+                    "y": {0: "batch_size"},  # First dimension of input 'y' is dynamic
+                    "output": {0: "batch_size"},  # First dimension of output is dynamic
+                },
+                f=tmpfile.name,
+                input_names=["x", "y"],
+                output_names=["output"],
+                opset_version=18,
+            )
+            min, max = 0, 5
+
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                config_override = {
+                    "nvbenjo": {
+                        "models": [
+                            {
+                                "name": "dummytorchmodel",
+                                "type_or_path": tmpfile.name,
+                                "num_batches": 2,
+                                "batch_sizes": [1, 2],
+                                "device_indices": [0],
+                                "shape": [
+                                    {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
+                                    {"name": "y", "shape": ["B", 20], "min_max": [min, max]},
+                                ],
+                            }
+                        ]
+                    }
+                }
+                cfg = compose(
+                    config_name="default",
+                    overrides=[
+                        f"output_dir={tmpoutdir}",
+                    ],
+                )
+                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                run_config(cfg)
+                _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)

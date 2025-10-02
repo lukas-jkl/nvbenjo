@@ -7,14 +7,12 @@ import pytest
 
 from nvbenjo.utils import (
     PrecisionType,
-    apply_non_amp_model_precision,
     format_num,
     format_seconds,
-    get_amp_ctxt_for_precision,
-    get_model_parameters,
     get_rnd_from_shape_s,
     EXAMPLE_VALID_SHAPES,
 )
+from nvbenjo.torch_utils import get_model_parameters, apply_non_amp_model_precision, get_amp_ctxt_for_precision
 
 
 def test_format_seconds():

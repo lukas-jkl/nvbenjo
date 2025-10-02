@@ -47,7 +47,7 @@ def format_num(num: ty.Union[int, float], bytes: bool = False) -> ty.Union[str, 
         num /= factor
 
 
-def format_seconds(time_seconds: float):
+def format_seconds(time_seconds: float) -> str:
     if time_seconds > 1:
         return f"{time_seconds:.3f} s"
     else:
@@ -59,87 +59,13 @@ def format_seconds(time_seconds: float):
             return f"{time_us:.3f} us"
 
 
-def get_amp_ctxt_for_precision(precision: PrecisionType, device: torch.device) -> AbstractContextManager:
-    if AMP_PREFIX in precision.value:
-        valid_values = [PrecisionType.AMP, PrecisionType.AMP_FP16, PrecisionType.AMP_BFLOAT16]
-        if precision not in valid_values:
-            raise ValueError(f"Invalid AMP precision type {precision} must be one of {valid_values}")
-
-        if precision in [PrecisionType.AMP]:
-            ctxt = torch.autocast(device_type=device.type, enabled=True)
-        elif precision in [PrecisionType.AMP_FP16]:
-            ctxt = torch.autocast(device_type=device.type, dtype=torch.float16, enabled=True)
-        elif precision in [PrecisionType.AMP_BFLOAT16]:
-            ctxt = torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=True)
-        else:
-            raise ValueError(f"Invalid precision type {precision}.")
-    else:
-        ctxt = nullcontext()
-    return ctxt
-
-
-def apply_non_amp_model_precision(
-    model: nn.Module,
-    batch: TensorLike,
-    precision: PrecisionType,
-):
-    def _apply_batch_precision(batch_tensor: torch.Tensor):
-        if AMP_PREFIX not in precision.value:
-            if precision == PrecisionType.FP16:
-                batch_tensor = batch_tensor.half()
-            elif precision == PrecisionType.BFLOAT16:
-                batch_tensor = batch_tensor.bfloat16()
-            else:
-                if precision != PrecisionType.FP32:
-                    raise ValueError(f"Invalid precision type {precision}.")
-            return batch_tensor
-
-    if AMP_PREFIX not in precision.value:
-        if precision == PrecisionType.FP16:
-            model = model.half()
-        elif precision == PrecisionType.BFLOAT16:
-            model = model.bfloat16()
-        else:
-            if precision != PrecisionType.FP32:
-                raise ValueError(f"Invalid precision type {precision}.")
-        if isinstance(batch, torch.Tensor):
-            batch = _apply_batch_precision(batch)
-        elif isinstance(batch, (list, tuple)):
-            batch = tuple(_apply_batch_precision(b) for b in batch)
-        elif isinstance(batch, dict):
-            batch = {k: _apply_batch_precision(v) for k, v in batch.items()}
-        elif batch is None:
-            pass
-        else:
-            raise ValueError(f"Unsupported batch type: {type(batch)}. Must be a Tensor, Tuple, or Dict.")
-
-        return model, batch
-    else:
-        return model, batch
-
-
-def get_model_parameters(model: nn.Module) -> int:
-    return sum(p.numel() for p in model.parameters())
-
-
-def run_model_with_input(model, input):
+def run_model_with_input(model: nn.Module, input):
     if isinstance(input, (list, tuple)):
         return model(*input)
     elif isinstance(input, dict):
         return model(**input)
     else:
         return model(input)
-
-
-def transfer_to_device(result: ty.Any, to_device: torch.device):
-    if hasattr(result, "to"):
-        return result.to(to_device)
-    if isinstance(result, Sequence):
-        return [transfer_to_device(ri, to_device=to_device) for ri in result]
-    elif hasattr(result, "items"):
-        return {k: transfer_to_device(v, to_device=to_device) for k, v in result.items()}
-    else:
-        raise ValueError(f"Unsupported result type: {type(result)} could not transfer to {to_device}")
 
 
 def _get_rnd(shape: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int) -> torch.Tensor:
