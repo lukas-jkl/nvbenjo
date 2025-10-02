@@ -93,7 +93,7 @@ def _measure_timings(
     device: torch.device,
     num_batches: int,
     progress_bar: Optional[Progress],
-    timing_function: Callable=torch_utils.measure_repeated_inference_timing,
+    timing_function: Callable = torch_utils.measure_repeated_inference_timing,
 ):
     if progress_bar is not None:
         measure_task = progress_bar.add_task(
@@ -167,15 +167,26 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
                     memory_alloc = torch_utils.measure_memory_allocation(model, batch, device)
                     cur_results = _measure_timings(
-                        model, batch, batch_size, device, model_cfg.num_batches, progress_bar,
+                        model,
+                        batch,
+                        batch_size,
+                        device,
+                        model_cfg.num_batches,
+                        progress_bar,
                         timing_function=torch_utils.measure_repeated_inference_timing,
                     )
             else:
                 from nvbenjo import onnx_utils
+
                 memory_alloc = 0
                 num_model_parameters = 0
                 cur_results = _measure_timings(
-                    model, batch, batch_size, device, model_cfg.num_batches, progress_bar,
+                    model,
+                    batch,
+                    batch_size,
+                    device,
+                    model_cfg.num_batches,
+                    progress_bar,
                     timing_function=onnx_utils.measure_repeated_inference_timing,
                 )
 

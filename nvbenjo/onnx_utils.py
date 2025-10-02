@@ -8,7 +8,9 @@ from nvbenjo.torch_utils import transfer_to_device
 import typing as ty
 
 
-def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ort.capi.onnxruntime_inference_collection.InferenceSession:
+def get_model(
+    type_or_path: str, device: torch.device, verbose=False, **kwargs
+) -> ort.capi.onnxruntime_inference_collection.InferenceSession:
     if not type_or_path.endswith(".onnx") and os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
 
@@ -21,12 +23,10 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
         else:
             providers = ["CPUExecutionProvider"]
         kwargs["providers"] = providers
-    
 
     sess = ort.InferenceSession(type_or_path, **kwargs)
     sess.io_binding()
     return sess
-
 
 
 def measure_repeated_inference_timing(
@@ -79,7 +79,7 @@ def measure_repeated_inference_timing(
                 )
         else:
             raise ValueError(f"Invalid input type {type(device_sample)}. Must be one of list, tuple, dict")
-        
+
         outputs = model.get_outputs()
         device_result = []
         for output in outputs:
@@ -94,10 +94,9 @@ def measure_repeated_inference_timing(
                 "tensor(float16)": torch.float16,
                 "tensor(int64)": torch.int64,
                 "tensor(int32)": torch.int32,
-                "tensor(bool)": torch.bool
+                "tensor(bool)": torch.bool,
             }
             torch_dtype = dtype_map.get(output.type, torch.float32)  # default to float32 if type not found
-
 
             output_tensor = torch.empty(size=s, dtype=torch_dtype, device=model_device)
             io_binding.bind_output(
