@@ -147,7 +147,6 @@ def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch
         r = run_model_with_input(model, batch)
     _ = transfer_to_device(r, to_device=torch.device("cpu"))
 
-
     if device.type == "cuda":
         logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
         # after_batch_allocation = torch.cuda.memory_allocated(device=device)
