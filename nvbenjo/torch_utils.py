@@ -1,19 +1,18 @@
-from nvbenjo import console
-import torch
+import logging
 import os
 import time
-import logging
-import pandas as pd
-import torch.nn as nn
-from collections.abc import Sequence
 import typing as ty
-
-import torchvision
+from collections.abc import Sequence
 from contextlib import AbstractContextManager, nullcontext
-
-from nvbenjo import utils
-from nvbenjo.utils import PrecisionType, AMP_PREFIX, TensorLike
 from typing import Callable, Optional
+
+import pandas as pd
+import torch
+import torch.nn as nn
+import torchvision
+
+from nvbenjo import console
+from nvbenjo.utils import AMP_PREFIX, PrecisionType, TensorLike
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +53,15 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
         )
 
 
+def run_model_with_input(model: nn.Module, input: TensorLike) -> TensorLike:
+    if isinstance(input, (list, tuple)):
+        return model(*input)
+    elif isinstance(input, dict):
+        return model(**input)
+    else:
+        return model(input)
+
+
 def transfer_to_device(result: ty.Any, to_device: torch.device) -> ty.Any:
     if hasattr(result, "to"):
         return result.to(to_device)
@@ -65,11 +73,7 @@ def transfer_to_device(result: ty.Any, to_device: torch.device) -> ty.Any:
         raise ValueError(f"Unsupported result type: {type(result)} could not transfer to {to_device}")
 
 
-def apply_non_amp_model_precision(
-    model: nn.Module,
-    batch: TensorLike,
-    precision: PrecisionType,
-) -> ty.Tuple[nn.Module, TensorLike]:
+def apply_batch_precision(batch: TensorLike, precision: PrecisionType) -> TensorLike:
     def _apply_batch_precision(batch_tensor: torch.Tensor):
         if AMP_PREFIX not in precision.value:
             if precision == PrecisionType.FP16:
@@ -79,8 +83,24 @@ def apply_non_amp_model_precision(
             else:
                 if precision != PrecisionType.FP32:
                     raise ValueError(f"Invalid precision type {precision}.")
-            return batch_tensor
+        return batch_tensor
 
+    if isinstance(batch, torch.Tensor):
+        batch = _apply_batch_precision(batch)
+    elif isinstance(batch, (list, tuple)):
+        batch = tuple(_apply_batch_precision(b) for b in batch)
+    elif isinstance(batch, dict):
+        batch = {k: _apply_batch_precision(v) for k, v in batch.items()}
+    else:
+        raise ValueError(f"Unsupported batch type: {type(batch)}. Must be a Tensor, Tuple, or Dict.")
+
+    return batch
+
+
+def apply_non_amp_model_precision(
+    model: nn.Module,
+    precision: PrecisionType,
+) -> nn.Module:
     if AMP_PREFIX not in precision.value:
         if precision == PrecisionType.FP16:
             model = model.half()
@@ -89,20 +109,8 @@ def apply_non_amp_model_precision(
         else:
             if precision != PrecisionType.FP32:
                 raise ValueError(f"Invalid precision type {precision}.")
-        if isinstance(batch, torch.Tensor):
-            batch = _apply_batch_precision(batch)
-        elif isinstance(batch, (list, tuple)):
-            batch = tuple(_apply_batch_precision(b) for b in batch)
-        elif isinstance(batch, dict):
-            batch = {k: _apply_batch_precision(v) for k, v in batch.items()}
-        elif batch is None:
-            pass
-        else:
-            raise ValueError(f"Unsupported batch type: {type(batch)}. Must be a Tensor, Tuple, or Dict.")
 
-        return model, batch
-    else:
-        return model, batch
+    return model
 
 
 def get_amp_ctxt_for_precision(precision: PrecisionType, device: torch.device) -> AbstractContextManager:
@@ -128,9 +136,9 @@ def get_model_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: torch.device, iterations: int = 3):
+def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch.device, iterations: int = 3) -> int:
     if device.type != "cuda":
-        return None
+        return -1
     torch.cuda.reset_peak_memory_stats(device=device)
     # before_run_allocation = torch.cuda.memory_allocated(device=device)
 
@@ -138,7 +146,7 @@ def measure_memory_allocation(model: nn.Module, batch: torch.Tensor, device: tor
     model = model.to(device)
     for i in range(iterations):
         r = model(batch)
-    _ = utils.transfer_to_device(r, to_device=torch.device("cpu"))
+    _ = transfer_to_device(r, to_device=torch.device("cpu"))
 
     logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
 
@@ -173,7 +181,7 @@ def measure_repeated_inference_timing(
             start_event.record()  # For GPU timing
         start_on_device = time.perf_counter()  # For CPU timing
 
-        device_result = utils.run_model_with_input(model, device_sample)
+        device_result = run_model_with_input(model, device_sample)
 
         if model_device.type == "cuda":
             stop_event.record()

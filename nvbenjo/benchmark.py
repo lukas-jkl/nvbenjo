@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 
 import numpy as np
 import pandas as pd
@@ -27,7 +27,7 @@ def load_model(type_or_path: str, device: torch.device, **kwargs):
         return torch_utils.get_model(type_or_path, device=device, **kwargs)
 
 
-def test_load_models(model_cfgs: list[ModelConfig]) -> None:
+def _test_load_models(model_cfgs: list[ModelConfig]) -> None:
     loaded_types = []
     logger.info("Checking if models are valid and available")
     for model_cfg in model_cfgs:
@@ -37,7 +37,7 @@ def test_load_models(model_cfgs: list[ModelConfig]) -> None:
 
 
 def benchmark_models(model_cfgs: list[ModelConfig]) -> pd.DataFrame:
-    test_load_models(model_cfgs)
+    _test_load_models(model_cfgs)
 
     with _get_progress_bar() as progress_bar:
         model_task = progress_bar.add_task("Benchmarking models", total=len(model_cfgs))
@@ -76,7 +76,7 @@ def _run_warmup(
 
         for _ in range(num_warmup_batches):
             batch = torch_utils.transfer_to_device(batch, device)
-            r = utils.run_model_with_input(model, batch)
+            r = torch_utils.run_model_with_input(model, batch)
             _ = torch_utils.transfer_to_device(r, to_device=torch.device("cpu"))
             if progress_bar is not None:
                 progress_bar.advance(warm_up_task)
@@ -87,7 +87,7 @@ def _run_warmup(
 
 
 def _measure_timings(
-    model: nn.Module,
+    model: Any,
     batch: utils.TensorLike,
     batch_size: int,
     device: torch.device,
@@ -150,18 +150,17 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
                 bench_task, description=f"  Device {device} | batch-size: {batch_size} | {precision.name}"
             )
 
-            batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
-
             model = load_model(model_cfg.type_or_path, device=device, **model_cfg.kwargs)
             if isinstance(model, nn.Module):
+                batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
+
                 if num_model_parameters is None:
                     num_model_parameters = torch_utils.get_model_parameters(model)
 
+                model = torch_utils.apply_non_amp_model_precision(model, precision=precision)
                 # only apply precision to input if no precision is specified
-                if set_dtype:
-                    model, _ = torch_utils.apply_non_amp_model_precision(model, None, precision=precision)
-                else:
-                    model, batch = torch_utils.apply_non_amp_model_precision(model, batch, precision=precision)
+                if not set_dtype:
+                    batch = torch_utils.apply_batch_precision(batch, precision=precision)
 
                 with torch_utils.get_amp_ctxt_for_precision(precision=precision, device=device):
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
@@ -178,8 +177,13 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
             else:
                 from nvbenjo import onnx_utils
 
+                batch = onnx_utils.get_rnd_input_batch(model.get_inputs(), model_cfg.shape, batch_size)
+
                 memory_alloc = 0
                 num_model_parameters = 0
+                # maybe use a onnx util instead that only applies to batch and respects which types are possible?
+                # maybe we can check automatically if model supports fp16/bf16
+                batch = torch_utils.apply_batch_precision(batch, precision=precision)
                 cur_results = _measure_timings(
                     model,
                     batch,

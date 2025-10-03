@@ -4,7 +4,6 @@ from omegaconf.listconfig import ListConfig
 from omegaconf.dictconfig import DictConfig
 
 import torch
-import torch.nn as nn
 
 BATCH_SIZE_IDENTIFIERS = ("B", "batch_size")
 
@@ -57,15 +56,6 @@ def format_seconds(time_seconds: float) -> str:
             return f"{time_us:.3f} us"
 
 
-def run_model_with_input(model: nn.Module, input):
-    if isinstance(input, (list, tuple)):
-        return model(*input)
-    elif isinstance(input, dict):
-        return model(**input)
-    else:
-        return model(input)
-
-
 def _get_rnd(shape: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int) -> torch.Tensor:
     if dtype is None or any(s in dtype for s in ["float", "double"]):
         dtype = dtype if dtype is not None else "float32"
@@ -77,8 +67,20 @@ def _get_rnd(shape: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_va
     return rnd
 
 
+def check_shape_dict(si: dict) -> None:
+    if "name" not in si:
+        raise ValueError(f"The shape definition {si} must contain a 'name' key.")
+    if "dtype" in si:
+        raise ValueError("The 'dtype' is not valid. Did you mean 'type'?")
+    if "shape" not in si:
+        raise ValueError(f"The shape definition {si} must contain a 'shape' key.")
+    for k in si.keys():
+        if k not in ["name", "type", "shape", "min_max"]:
+            raise ValueError(f"Invalid key {k} in shape definition {si}.")
+
+
 def get_rnd_from_shape_s(
-    shape: ty.Tuple, batch_size: int, dtype=None, min_val=0, max_val=1
+    shape: ty.Tuple | ty.Dict, batch_size: int, dtype=None, min_val=0, max_val=1
 ) -> ty.Tuple[TensorLike, bool]:
     try:
         depends_on_batch = False
@@ -102,12 +104,8 @@ def get_rnd_from_shape_s(
             rnd_input = {}
             for si in shape:
                 # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
+                check_shape_dict(si)
                 name = si["name"]
-                if "dtype" in si:
-                    raise ValueError("The 'dtype' is not valid. Did you mean 'type'?")
-                for k in si.keys():
-                    if k not in ["name", "type", "shape", "min_max"]:
-                        raise ValueError(f"Invalid key {k} in shape definition {si}.")
                 if "type" in si:
                     set_individual_dtype = True
                 rnd_input[name] = _get_rnd(

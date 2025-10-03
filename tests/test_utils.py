@@ -1,18 +1,12 @@
-from contextlib import nullcontext
-
-import torch
-import torch.nn as nn
-
 import pytest
+import torch
 
 from nvbenjo.utils import (
-    PrecisionType,
+    EXAMPLE_VALID_SHAPES,
     format_num,
     format_seconds,
     get_rnd_from_shape_s,
-    EXAMPLE_VALID_SHAPES,
 )
-from nvbenjo.torch_utils import get_model_parameters, apply_non_amp_model_precision, get_amp_ctxt_for_precision
 
 
 def test_format_seconds():
@@ -34,63 +28,6 @@ def test_format_num():
     assert format_num(1125899906842624, bytes=True) == "1.00 PB"
 
 
-def test_get_model_parameters():
-    class SimpleModel(nn.Module):
-        def __init__(self):
-            super(SimpleModel, self).__init__()
-            self.fc = nn.Linear(10, 10, bias=False)
-
-        def forward(self, x):
-            return self.fc(x)
-
-    model = SimpleModel()
-    num_params = get_model_parameters(model)
-    assert num_params == 100
-
-
-def test_apply_non_amp_model_precision():
-    class SimpleModel(nn.Module):
-        def __init__(self):
-            super(SimpleModel, self).__init__()
-            self.fc = nn.Linear(10, 10, bias=False)
-
-        def forward(self, x):
-            return self.fc(x)
-
-    model = SimpleModel()
-    batch = torch.randn(10, 10)
-    model, batch = apply_non_amp_model_precision(model, batch, PrecisionType.FP16)
-    assert model.fc.weight.dtype == torch.float16
-    assert batch.dtype == torch.float16
-
-    model = SimpleModel()
-    batch = torch.randn(10, 10)
-    model, batch = apply_non_amp_model_precision(model, batch, PrecisionType.FP32)
-    assert model.fc.weight.dtype == torch.float32
-    assert batch.dtype == torch.float32
-
-    model = SimpleModel()
-    batch = torch.randn(10, 10)
-    model, batch = apply_non_amp_model_precision(model, batch, PrecisionType.BFLOAT16)
-    assert model.fc.weight.dtype == torch.bfloat16
-    assert batch.dtype == torch.bfloat16
-
-    model = SimpleModel()
-    batch = torch.randn(10, 10)
-    model, batch = apply_non_amp_model_precision(model, batch, PrecisionType.AMP_FP16)
-    # only shall apply non-amp precisions
-    assert model.fc.weight.dtype == torch.float32
-    assert batch.dtype == torch.float32
-
-
-def test_get_amp_ctxt_for_precision():
-    ctxt = get_amp_ctxt_for_precision(PrecisionType.AMP, torch.device("cpu"))
-    assert isinstance(ctxt, torch.autocast)
-
-    ctxt = get_amp_ctxt_for_precision(PrecisionType.FP32, torch.device("cpu"))
-    assert isinstance(ctxt, nullcontext)
-
-
 def test_get_rnd_shape_examples():
     for example_shape in EXAMPLE_VALID_SHAPES:
         _ = get_rnd_from_shape_s(example_shape, batch_size=12)
@@ -106,6 +43,9 @@ def test_get_rnd_shape_invalid():
         _ = get_rnd_from_shape_s(example_shape, batch_size=12, min_val=0, max_val="invalid")
     with pytest.raises(ValueError):
         _ = get_rnd_from_shape_s((1, 3, 224, 224), batch_size=12)  # missing batch size identifier
+
+    with pytest.raises(ValueError):
+        _ = get_rnd_from_shape_s(tuple(), batch_size=12, min_val=0, max_val=1)
 
 
 def test_get_rnd_shape_valid():

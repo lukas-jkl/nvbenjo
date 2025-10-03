@@ -278,6 +278,7 @@ def test_onnx():
                                     {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
                                     {"name": "y", "shape": ["B", 20], "min_max": [min, max]},
                                 ],
+                                "precisions": ["FP32"],
                             }
                         ]
                     }
