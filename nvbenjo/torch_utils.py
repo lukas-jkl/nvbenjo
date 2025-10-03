@@ -137,21 +137,23 @@ def get_model_parameters(model: nn.Module) -> int:
 
 
 def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch.device, iterations: int = 3) -> int:
-    if device.type != "cuda":
-        return -1
-    torch.cuda.reset_peak_memory_stats(device=device)
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device=device)
     # before_run_allocation = torch.cuda.memory_allocated(device=device)
 
-    batch = batch.to(device)
+    batch = transfer_to_device(batch, to_device=device)
     model = model.to(device)
-    for i in range(iterations):
-        r = model(batch)
+    for _ in range(iterations):
+        r = run_model_with_input(model, batch)
     _ = transfer_to_device(r, to_device=torch.device("cpu"))
 
-    logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
 
-    # after_batch_allocation = torch.cuda.memory_allocated(device=device)
-    max_batch_allocation = torch.cuda.max_memory_allocated(device=device)
+    if device.type == "cuda":
+        logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
+        # after_batch_allocation = torch.cuda.memory_allocated(device=device)
+        max_batch_allocation = torch.cuda.max_memory_allocated(device=device)
+    else:
+        max_batch_allocation = -1
 
     return max_batch_allocation
 
