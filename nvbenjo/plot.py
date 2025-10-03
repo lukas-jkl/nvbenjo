@@ -37,6 +37,15 @@ def visualize_results(
                 plt.savefig(join(output_dir, f"{model}_{device_stem}{key}.png"))
                 plt.close()
 
+    if len(results.device_idx.unique()) == 1:
+        for key in keys:
+            sns.catplot(data=results, y=key, hue=hue, col=col, kind=kind, row="model", sharey=True)
+            device_stem = f"{device_idx}_" if mult_devices else ""
+            plt.savefig(join(output_dir, f"summary_{key}.png"))
+            plt.close()
+
+    # TODO: maybe also check if only one model type then do same for device
+
 
 def print_system_info(system_info: dict):
     text_color = "white"
