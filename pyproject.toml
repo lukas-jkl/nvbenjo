@@ -21,8 +21,17 @@ dependencies = [
 [project.scripts]
 nvbenjo = "nvbenjo.cli:nvbenjo"
 [project.optional-dependencies]
+onnx-cpu = [
+    "onnx>=1.14.0",
+    "onnxruntime>=1.15.0",
+]
+onnx-gpu = [
+    "onnx>=1.14.0",
+    "onnxruntime-gpu>=1.15.0",
+]
 dev = [
     "pytest",
+    "pytest-cov",
     "ruff",
     "ipython",
     "pytest",
