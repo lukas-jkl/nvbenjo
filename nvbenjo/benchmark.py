@@ -185,9 +185,15 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
                     num_model_parameters = torch_utils.get_model_parameters(model)
 
                 model = torch_utils.apply_non_amp_model_precision(model, precision=precision)
+
                 # only apply precision to input if no precision is specified
                 if not set_dtype:
                     batch = torch_utils.apply_batch_precision(batch, precision=precision)
+                else:
+                    batch = {
+                        k: torch_utils.apply_batch_precision(v, precision=precision) if not set_dtype[k] else v
+                        for k, v in batch.items()
+                    }
 
                 with torch_utils.get_amp_ctxt_for_precision(precision=precision, device=device):
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
@@ -208,9 +214,16 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
 
                 memory_alloc = 0
                 num_model_parameters = 0
-                # maybe use a onnx util instead that only applies to batch and respects which types are possible?
-                # maybe we can check automatically if model supports fp16/bf16
-                batch = torch_utils.apply_batch_precision(batch, precision=precision)
+                set_dtype = False
+
+                # only apply precision to input if no precision is specified
+                if not set_dtype:
+                    batch = torch_utils.apply_batch_precision(batch, precision=precision)
+                else:
+                    batch = {
+                        k: torch_utils.apply_batch_precision(v, precision=precision) if not set_dtype[k] else v
+                        for k, v in batch.items()
+                    }
                 memory_alloc = onnx_utils.measure_memory_allocation(model, batch, device)
                 cur_results = _measure_timings(
                     model,
