@@ -42,9 +42,10 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
         with open(join(output_dir, "config.yaml"), "w") as f:
             f.write(OmegaConf.to_yaml(cfg))
 
-    plot.print_system_info(system_info)
     if cfg.output_dir is not None:
+        logger.info("Generating plots...")
         plot.visualize_results(results, output_dir=output_dir)
+    plot.print_system_info(system_info)
     plot.print_results(results)
     logger.info(f"Benchmark finished, outputs in: {output_dir}")
 
