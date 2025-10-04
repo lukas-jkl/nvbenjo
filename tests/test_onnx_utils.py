@@ -4,7 +4,13 @@ from dataclasses import dataclass
 import pytest
 import torch
 
-from nvbenjo import onnx_utils
+try:
+    from nvbenjo import onnx_utils
+except ImportError as e:
+    if "onnxruntime" in str(e):
+        pytest.skip("onnxruntime is not installed, skipping ONNX utils tests.", allow_module_level=True)
+    else:
+        raise
 
 
 @dataclass
@@ -54,12 +60,12 @@ def test_invalid_get_rnd_input_batch():
 
     # single shape but multiple model inputs
     user_input_shapes = ("B", 3, 224, 224)
-    with pytest.raises(ValueError, match="The model has multiple inputs, but the provided shape is a single shape."):
+    with pytest.raises(ValueError, match="The model has multiple inputs, but the provided input is a single shape."):
         _ = onnx_utils.get_rnd_input_batch(inputs, user_input_shapes, batch_size)
 
     # mismatching number of shapes
     user_input_shapes = (("B", 3, 224, 224), ("B", 10), (1, 5))
-    with pytest.raises(ValueError, match="The model has 2 inputs, but the provided shape has 3 shapes."):
+    with pytest.raises(ValueError, match="The model has 2 inputs, but the provided input has 3 shapes."):
         _ = onnx_utils.get_rnd_input_batch(inputs, user_input_shapes, batch_size)
 
     # invalid input name
@@ -72,7 +78,7 @@ def test_invalid_get_rnd_input_batch():
 
     # invalid num shapes
     user_input_shapes = ({"name": "input1", "type": "float", "shape": ("B", 3, 224, 2.3)},)
-    with pytest.raises(ValueError, match="The model has 2 inputs, but the provided shape has 1 shapes."):
+    with pytest.raises(ValueError, match="The model has 2 inputs, but the provided input has 1 shapes."):
         _ = onnx_utils.get_rnd_input_batch(inputs, user_input_shapes, batch_size)
 
     # invalid shape

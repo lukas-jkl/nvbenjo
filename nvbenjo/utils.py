@@ -7,17 +7,19 @@ import torch
 
 BATCH_SIZE_IDENTIFIERS = ("B", "batch_size")
 
-EXAMPLE_VALID_SHAPES = [
+Shape = ty.Union[ty.Tuple[ty.Union[int, str], ...], ty.Dict[str, ty.Any]]
+TensorLike = ty.Union[torch.Tensor, ty.Tuple[torch.Tensor, ...], ty.Dict[str, torch.Tensor]]
+
+EXAMPLE_VALID_SHAPES: ty.List[Shape] = [
     ("B", 3, 224, 224),
     (("B", 3, 224, 224), ("B", 10)),
     ({"name": "input1", "type": "float", "shape": ("B", 3, 224, 224), "min_max": (0, 1)},),
     (
         {"name": "input1", "type": "float", "shape": ("B", 3, 224, 224), "min_max": (0, 1)},
         {"name": "input2", "type": "int", "shape": (1, 3)},
+        {"name": "input3", "type": "int", "shape": (), "value": 42},
     ),
 ]
-
-TensorLike = ty.Union[torch.Tensor, ty.Tuple[torch.Tensor, ...], ty.Dict[str, torch.Tensor]]
 
 AMP_PREFIX = "amp"
 
@@ -57,25 +59,25 @@ def format_seconds(time_seconds: float) -> str:
 
 
 def _get_rnd(
-    shape: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int, value: ty.Optional[ty.Any] = None
+    shape_tuple: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int, value: ty.Optional[ty.Any] = None
 ) -> torch.Tensor:
     if dtype is None or any(s in dtype for s in ["float", "double"]):
         dtype = dtype if dtype is not None else "float32"
         if value:
-            rnd = torch.full(size=shape, fill_value=value, dtype=getattr(torch, dtype))
+            rnd = torch.full(size=shape_tuple, fill_value=value, dtype=getattr(torch, dtype))
         else:
-            rnd = torch.distributions.Uniform(min_val, max_val).sample(shape).to(dtype=getattr(torch, dtype))
+            rnd = torch.distributions.Uniform(min_val, max_val).sample(shape_tuple).to(dtype=getattr(torch, dtype))
     elif any(s in dtype for s in ["int", "long"]):
         if value:
-            rnd = torch.full(size=shape, fill_value=value, dtype=getattr(torch, dtype))
+            rnd = torch.full(size=shape_tuple, fill_value=value, dtype=getattr(torch, dtype))
         else:
-            rnd = torch.randint(low=int(min_val), high=int(max_val), size=shape, dtype=getattr(torch, dtype))
+            rnd = torch.randint(low=int(min_val), high=int(max_val), size=shape_tuple, dtype=getattr(torch, dtype))
     else:
         raise ValueError(f"Invalid dtype {dtype}. Must be one of int, long, float, double")
     return rnd
 
 
-def check_shape_dict(si: dict) -> None:
+def _check_shape_dict(si: dict) -> None:
     if "name" not in si:
         raise ValueError(f"The shape definition {si} must contain a 'name' key.")
     if "dtype" in si:
@@ -89,9 +91,7 @@ def check_shape_dict(si: dict) -> None:
         raise ValueError(f"Invalid shape definition {si} can only specify min_max or value.")
 
 
-def get_rnd_from_shape_s(
-    shape: ty.Tuple | ty.Dict, batch_size: int, dtype=None, min_val=0, max_val=1
-) -> ty.Tuple[TensorLike, bool]:
+def get_rnd_from_shape_s(shape: Shape, batch_size: int, dtype=None, min_val=0, max_val=1) -> ty.Tuple[TensorLike, bool]:
     try:
         depends_on_batch = False
         set_individual_dtype = False
@@ -104,7 +104,7 @@ def get_rnd_from_shape_s(
 
         if not isinstance(shape, dict) and all(isinstance(si, (str, int)) for si in shape):
             # simple shape e.g. (B, 3, 224, 224)
-            rnd_input = _get_rnd(shape=_get_rnd_batch(shape), dtype=dtype, min_val=min_val, max_val=max_val)
+            rnd_input = _get_rnd(shape_tuple=_get_rnd_batch(shape), dtype=dtype, min_val=min_val, max_val=max_val)
         elif all(isinstance(si, (tuple, list, ListConfig)) for si in shape):
             # tuple of shapes e.g. ((B, 3, 224, 224), (B, 10))
             rnd_input = tuple(
@@ -114,12 +114,12 @@ def get_rnd_from_shape_s(
             rnd_input = {}
             for si in shape:
                 # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
-                check_shape_dict(si)
+                _check_shape_dict(si)
                 name = si["name"]
                 if "type" in si:
                     set_individual_dtype = True
                 rnd_input[name] = _get_rnd(
-                    shape=_get_rnd_batch(si["shape"]),
+                    shape_tuple=_get_rnd_batch(si["shape"]),
                     dtype=si.get("type", dtype),
                     min_val=si.get("min_max", (min_val, max_val))[0],
                     max_val=si.get("min_max", (min_val, max_val))[1],

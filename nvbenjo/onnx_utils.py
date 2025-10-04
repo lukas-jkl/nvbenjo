@@ -4,17 +4,23 @@ import nvitop
 import threading
 import typing as ty
 
-import onnxruntime as ort
+try:
+    import onnxruntime as ort  # type: ignore
+except ImportError:
+    raise ImportError(
+        "onnxruntime is not installed. Please install nvbenjo with nvbenjo[onnx-gpu] or nvbenjo[onnx-cpu] extras."
+    )
+
 import pandas as pd
 import torch
 from omegaconf import DictConfig, ListConfig
 
 from nvbenjo import console
 from nvbenjo.torch_utils import transfer_to_device
-from nvbenjo.utils import EXAMPLE_VALID_SHAPES, check_shape_dict, get_rnd_from_shape_s
+from nvbenjo.utils import EXAMPLE_VALID_SHAPES, _check_shape_dict, get_rnd_from_shape_s, Shape
 
 
-#TODO: remove verbose
+# TODO: remove verbose
 def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ort.InferenceSession:
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
@@ -27,11 +33,10 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         else:
             providers = ["CPUExecutionProvider"]
-        kwargs["providers"] = providers
     else:
         providers = kwargs.pop("providers")
 
-    session_options = ort.SessionOptions() # type: ignore
+    session_options = ort.SessionOptions()  # type: ignore
     session_options.log_severity_level = 3
     # session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     provider_options = kwargs.get("provider_options", None)
@@ -42,7 +47,9 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
     return sess
 
 
-def _sample_gpu_memory(device: torch.device, stop_event: threading.Event, max_mem: ty.List[int], sample_time_s: float = 0.010):
+def _sample_gpu_memory(
+    device: torch.device, stop_event: threading.Event, max_mem: ty.List[int], sample_time_s: float = 0.010
+):
     if device.type == "cuda":
         gpu = nvitop.Device(device.index)
     else:
@@ -86,7 +93,7 @@ def _get_formated_input_info(onnx_inputs) -> str:
     )
 
 
-def get_rnd_input_batch(onnx_session_inputs, shape: tuple, batch_size: int) -> ty.Dict[str, torch.Tensor]:
+def get_rnd_input_batch(onnx_session_inputs, shape: Shape, batch_size: int) -> ty.Dict[str, torch.Tensor]:
     def strip_type_string(s: str) -> str:
         if s.startswith("tensor(") and s.endswith(")"):
             s = s[len("tensor(") : -1]
@@ -96,7 +103,7 @@ def get_rnd_input_batch(onnx_session_inputs, shape: tuple, batch_size: int) -> t
         # simple shape e.g. (B, 3, 224, 224)
         if len(onnx_session_inputs) != 1:
             raise ValueError(
-                "The model has multiple inputs, but the provided shape is a single shape."
+                "The model has multiple inputs, but the provided input is a single shape."
                 f"Model Inputs: \n{_get_formated_input_info(onnx_session_inputs)}"
             )
         model_input = onnx_session_inputs[0]
@@ -121,7 +128,7 @@ def get_rnd_input_batch(onnx_session_inputs, shape: tuple, batch_size: int) -> t
                 f"Model Inputs: \n{_get_formated_input_info(onnx_session_inputs)}"
             )
         for si in rnd_shape:
-            check_shape_dict(si)
+            _check_shape_dict(si)
             # # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
             if si["name"] not in onnx_inputs_by_name:
                 raise ValueError(
@@ -173,7 +180,9 @@ def measure_repeated_inference_timing(
 
     # run model once so we know the output shapes
     outputs = model.run(None, {n: d.cpu().numpy() for n, d in sample.items()})
-    output_shapes = {onnx_output.name: output_shape.shape for onnx_output, output_shape in zip(onnx_model_outputs, outputs)}
+    output_shapes = {
+        onnx_output.name: output_shape.shape for onnx_output, output_shape in zip(onnx_model_outputs, outputs)
+    }
     del outputs
 
     for _ in range(num_runs):

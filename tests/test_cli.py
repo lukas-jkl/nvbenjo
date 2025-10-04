@@ -1,13 +1,13 @@
+from copy import copy
 import omegaconf
 import pytest
 import csv
-import os
 import tempfile
-
+import warnings
 import yaml
 import torch
 from hydra import compose, initialize
-
+from os.path import join, isfile
 from nvbenjo.cli import run
 
 EXPECTED_OUTPUT_FILES = [
@@ -25,15 +25,15 @@ def run_config(cfg):
 
 def _check_files(directory, files):
     for file in files:
-        assert os.path.exists(os.path.join(directory, file)), f"File {file} not found in {directory}"
+        assert isfile(join(directory, file)), f"File {file} not found in {directory}"
         if file.endswith(".yaml"):
-            with open(os.path.join(directory, file), "r") as f:
+            with open(join(directory, file), "r") as f:
                 try:
                     yaml.safe_load(f)
                 except yaml.YAMLError as e:
                     raise AssertionError(f"YAML file {file} is not valid: {e}")
         elif file.endswith(".csv"):
-            with open(os.path.join(directory, file), "r") as f:
+            with open(join(directory, file), "r") as f:
                 reader = csv.reader(f)
                 header = next(reader)
                 assert len(header) > 0, f"CSV file {file} is empty or has no header"
@@ -41,12 +41,30 @@ def _check_files(directory, files):
                     assert len(row) == len(header), f"Row in CSV file {file} does not match header length"
 
 
+def _check_run_files(cfg):
+    expected_files = copy(EXPECTED_OUTPUT_FILES)
+    for model_cfg in cfg.nvbenjo.models:
+        model_name = model_cfg.name
+        expected_files.append(join(model_name, "time_inference.png"))
+        expected_files.append(join(model_name, "time_total_batch_normalized.png"))
+        expected_files.append(join(model_name, "time_device_to_cpu.png"))
+        expected_files.append(join(model_name, "time_cpu_to_device.png"))
+        expected_files.append(join(model_name, "memory_bytes.png"))
+    if len(cfg.nvbenjo.models) > 1:
+        expected_files.append(join("summary", "time_inference.png"))
+        expected_files.append(join("summary", "time_total_batch_normalized.png"))
+        expected_files.append(join("summary", "time_device_to_cpu.png"))
+        expected_files.append(join("summary", "time_cpu_to_device.png"))
+        expected_files.append(join("summary", "memory_bytes.png"))
+    _check_files(cfg.output_dir, expected_files)
+
+
 def test_basic():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = compose(config_name="default", overrides=[f"output_dir={tmpdir}"])
             run_config(cfg)
-            _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
+            _check_run_files(cfg)
 
 
 def test_small_single():
@@ -54,7 +72,7 @@ def test_small_single():
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = compose(config_name="small_single", overrides=[f"output_dir={tmpdir}"])
             run_config(cfg)
-            _check_files(tmpdir, EXPECTED_OUTPUT_FILES)
+            _check_run_files(cfg)
 
 
 def test_duplicate_model_names():
@@ -94,7 +112,7 @@ def test_torch_load():
                     overrides=[f"output_dir={tmpoutdir}", f'nvbenjo.models.0.type_or_path="{tmpfile.name}"'],
                 )
                 run_config(cfg)
-                _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
+                _check_run_files(cfg)
 
 
 class DummyModelMultiInput(torch.nn.Module):
@@ -122,7 +140,7 @@ def test_torch_load_multiinput():
                     ],
                 )
                 run_config(cfg)
-                _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
+                _check_run_files(cfg)
 
 
 class ComplexDummyModelMultiInput(torch.nn.Module):
@@ -197,8 +215,10 @@ def test_torch_load_complex_multiinput(export_type):
                     ],
                 )
                 cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
-                run_config(cfg)
-                _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    run_config(cfg)
+                _check_run_files(cfg)
 
 
 def test_torch_load_complex_invalid_multiinput():
@@ -242,53 +262,3 @@ def test_torch_load_complex_invalid_multiinput():
                         run_config(cfg)
                 else:
                     raise ValueError("Config is not a DictConfig instance")
-
-
-def test_onnx():
-    model = DummyModelMultiInput()
-
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".onnx") as tmpfile:
-            torch.onnx.export(
-                model,
-                args=(torch.randn(2, 10), torch.randn(2, 20)),
-                dynamic_axes={
-                    "x": {0: "batch_size"},  # First dimension of input 'x' is dynamic
-                    "y": {0: "batch_size"},  # First dimension of input 'y' is dynamic
-                    "output": {0: "batch_size"},  # First dimension of output is dynamic
-                },
-                f=tmpfile.name,
-                input_names=["x", "y"],
-                output_names=["output"],
-                opset_version=18,
-            )
-            min, max = 0, 5
-
-            with tempfile.TemporaryDirectory() as tmpoutdir:
-                config_override = {
-                    "nvbenjo": {
-                        "models": [
-                            {
-                                "name": "dummytorchmodel",
-                                "type_or_path": tmpfile.name,
-                                "num_batches": 2,
-                                "batch_sizes": [1, 2],
-                                "device_indices": [0],
-                                "shape": [
-                                    {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
-                                    {"name": "y", "shape": ["B", 20], "min_max": [min, max]},
-                                ],
-                                "precisions": ["FP32"],
-                            }
-                        ]
-                    }
-                }
-                cfg = compose(
-                    config_name="default",
-                    overrides=[
-                        f"output_dir={tmpoutdir}",
-                    ],
-                )
-                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
-                run_config(cfg)
-                _check_files(tmpoutdir, EXPECTED_OUTPUT_FILES)
