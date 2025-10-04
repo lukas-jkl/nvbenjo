@@ -17,7 +17,7 @@ from omegaconf import DictConfig, ListConfig
 
 from nvbenjo import console
 from nvbenjo.torch_utils import transfer_to_device
-from nvbenjo.utils import EXAMPLE_VALID_SHAPES, _check_shape_dict, get_rnd_from_shape_s, Shape
+from nvbenjo.utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, get_rnd_from_shape_s, Shape
 
 
 # TODO: remove verbose
@@ -245,7 +245,7 @@ def measure_repeated_inference_timing(
         try:
             transfer_to_device_fn(device_result, torch.device("cpu"))
         except Exception:
-            console.print("[yellow]Warning: Could not transfer model output to CPU.[/yellow]")
+            console.print(TRANSFER_WARNING)
         stop_on_cpu = time.perf_counter()
 
         assert elapsed_on_device > 0

@@ -78,8 +78,8 @@ def _run_warmup(
             try:
                 _ = torch_utils.transfer_to_device(r, to_device=torch.device("cpu"))
             except Exception:
-                console.print("[yellow]Warning: Could not transfer model output to CPU.[/yellow]")
-        
+                console.print(utils.TRANSFER_WARNING)
+
             if progress_bar is not None:
                 progress_bar.advance(warm_up_task)
 

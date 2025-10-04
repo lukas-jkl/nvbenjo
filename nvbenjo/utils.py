@@ -6,6 +6,9 @@ from omegaconf.dictconfig import DictConfig
 import torch
 
 BATCH_SIZE_IDENTIFIERS = ("B", "batch_size")
+TRANSFER_WARNING = (
+    "[yellow]Warning: Could not transfer model output to CPU. Time to CPU measures will be incorrect.[/yellow]"
+)
 
 Shape = ty.Union[ty.Tuple[ty.Union[int, str], ...], ty.Dict[str, ty.Any]]
 TensorLike = ty.Union[torch.Tensor, ty.Tuple[torch.Tensor, ...], ty.Dict[str, torch.Tensor]]

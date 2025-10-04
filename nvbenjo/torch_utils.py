@@ -12,7 +12,7 @@ import torch.nn as nn
 import torchvision
 
 from nvbenjo import console
-from nvbenjo.utils import AMP_PREFIX, PrecisionType, TensorLike
+from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,7 @@ def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch
     try:
         _ = transfer_to_device(r, to_device=torch.device("cpu"))
     except Exception:
-        console.print("[yellow]Warning: Could not transfer model output to CPU.[/yellow]")
+        console.print(TRANSFER_WARNING)
 
     if device.type == "cuda":
         logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
@@ -206,7 +206,7 @@ def measure_repeated_inference_timing(
         try:
             transfer_to_device_fn(device_result, torch.device("cpu"))
         except Exception:
-            console.print("[yellow]Warning: Could not transfer model output to CPU.[/yellow]")
+            console.print(TRANSFER_WARNING)
         stop_on_cpu = time.perf_counter()
 
         assert elapsed_on_device > 0
