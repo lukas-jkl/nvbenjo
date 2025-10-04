@@ -31,7 +31,7 @@ def visualize_results(
     for model in results.model.unique():
         mult_devices = len(results.device.unique()) > 1
         for device in results.device.unique():
-            model_device_results = results[results.model == model][results.device == device]
+            model_device_results = results[(results.model == model) & (results.device == device)]
             for key in keys:
                 sns.catplot(data=model_device_results, x="model", y=key, hue=hue, col=col, kind=kind)
                 device_stem = f"{device}_" if mult_devices else ""

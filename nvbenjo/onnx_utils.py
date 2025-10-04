@@ -242,7 +242,10 @@ def measure_repeated_inference_timing(
             stop_on_device = time.perf_counter()
             elapsed_on_device = stop_on_device - start_on_device
 
-        transfer_to_device_fn(device_result, torch.device("cpu"))
+        try:
+            transfer_to_device_fn(device_result, torch.device("cpu"))
+        except Exception:
+            console.print("[yellow]Warning: Could not transfer model output to CPU.[/yellow]")
         stop_on_cpu = time.perf_counter()
 
         assert elapsed_on_device > 0

@@ -75,7 +75,11 @@ def _run_warmup(
         for _ in range(num_warmup_batches):
             batch = torch_utils.transfer_to_device(batch, device)
             r = torch_utils.run_model_with_input(model, batch)
-            _ = torch_utils.transfer_to_device(r, to_device=torch.device("cpu"))
+            try:
+                _ = torch_utils.transfer_to_device(r, to_device=torch.device("cpu"))
+            except Exception:
+                console.print("[yellow]Warning: Could not transfer model output to CPU.[/yellow]")
+        
             if progress_bar is not None:
                 progress_bar.advance(warm_up_task)
 
