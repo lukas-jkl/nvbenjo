@@ -71,6 +71,7 @@ def measure_memory_allocation(
     # Start memory sampling thread so we can measure peak memory usage in parallel
     sampler = threading.Thread(target=_sample_gpu_memory, args=(device, stop_event, max_mem))
     sampler.start()
+    time.sleep(0.001)  # give sampler some time to start
 
     try:
         for _ in range(iterations):
@@ -81,7 +82,7 @@ def measure_memory_allocation(
 
     max_mem = max_mem[0]
     if max_mem == 0:
-        raise RuntimeError("Memory measurement failed! Did receive 0 maybe the model runtime was too short.")
+        raise RuntimeError("Memory measurement failed!")
 
     return max_mem
 
