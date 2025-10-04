@@ -17,7 +17,7 @@ from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLik
 logger = logging.getLogger(__name__)
 
 
-def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> nn.Module:
+def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ty.Any:
     if os.path.isfile(type_or_path):
         if verbose and console is not None:
             console.print(f"Loading torch model {type_or_path}")
@@ -42,19 +42,21 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
         from transformers import AutoModel  # type: ignore
 
         return AutoModel.from_pretrained(type_or_path).to(device)
-
-    available_torchvision_models = torchvision.models.list_models()
-    if type_or_path in available_torchvision_models:
-        if verbose and console is not None:
-            console.print(f"Loading torchvision model {type_or_path}")
-        return torchvision.models.get_model(type_or_path, **kwargs).to(device)
+    elif type_or_path.startswith("torchvision:"):
+        type_or_path = type_or_path[len("torchvision:") :]
+        available_torchvision_models = torchvision.models.list_models()
+        if type_or_path in available_torchvision_models:
+            if verbose and console is not None:
+                console.print(f"Loading torchvision model {type_or_path}")
+            return torchvision.models.get_model(type_or_path, **kwargs).to(device)
     else:
+        available_torchvision_models = torchvision.models.list_models()
         raise ValueError(
             (
                 f"Invalid model {type_or_path}. Must be: \n"
                 "- a valid path \n"
                 "- a valid huggingface AutoModel (named 'huggingface:<model-name>')  \n"
-                f"- or one of these available torchvision models: {available_torchvision_models}"
+                f"- a valid torchvision model (named 'torchvision:<model-name>') from {available_torchvision_models} \n"
             )
         )
 
