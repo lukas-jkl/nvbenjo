@@ -5,7 +5,7 @@ defaults:
 nvbenjo:
   models:
       - name: silero
-        type_or_path: /home/lukas/.cache/huggingface/hub/models--onnx-community--silero-vad/snapshots/e71cae966052b992a7eca6b17738916ce0eca4ec/onnx/model_fp16.onnx
+        type_or_path: /home/lukas/Downloads/silero_model_fp16.onnx
         kwargs: {
           providers: ["CUDAExecutionProvider", "CPUExecutionProvider"],
           session_options: {}
@@ -17,5 +17,5 @@ nvbenjo:
         num_warmup_batches: 5
         num_batches: 20
         batch_sizes: [1, 8, 16, 128]
-        devices: ["cuda:0"]
+        devices: ["cuda:0", "cpu"]
         precisions: [FP32]

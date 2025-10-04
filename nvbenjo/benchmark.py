@@ -135,12 +135,12 @@ def _get_device(model_type: str, device: str, console) -> torch.device:
             from nvbenjo import onnx_utils
 
             available_providers = onnx_utils.ort.get_available_providers()  # type: ignore
-            if torch.cuda.is_available() and "CudaExecutionProvider" in available_providers:
+            if torch.cuda.is_available() and "CUDAExecutionProvider" in available_providers:
                 return device_chosen
             else:
                 if torch.cuda.is_available():
                     console.print(
-                        "[yellow]CudaExecutionProvider is not available in onnxruntime. Running on CPU.[/yellow]"
+                        "[yellow]CUDAExecutionProvider is not available in onnxruntime. Running on CPU.[/yellow]"
                     )
                 else:
                     console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
@@ -224,7 +224,7 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
             cur_results["model"] = model_cfg.name
             cur_results["batch_size"] = batch_size
             cur_results["precision"] = precision.value
-            cur_results["device_idx"] = device.index if device.index is not None else -1
+            cur_results["device"] = str(device)
             results.append(cur_results)
         except torch.cuda.OutOfMemoryError:
             console.print(

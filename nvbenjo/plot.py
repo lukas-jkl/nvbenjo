@@ -29,20 +29,20 @@ def visualize_results(
 ):
     sns.set_style("whitegrid")
     for model in results.model.unique():
-        mult_devices = len(results.device_idx.unique()) > 1
-        for device_idx in results.device_idx.unique():
-            model_device_results = results[results.model == model][results.device_idx == device_idx]
+        mult_devices = len(results.device.unique()) > 1
+        for device in results.device.unique():
+            model_device_results = results[results.model == model][results.device == device]
             for key in keys:
                 sns.catplot(data=model_device_results, x="model", y=key, hue=hue, col=col, kind=kind)
-                device_stem = f"{device_idx}_" if mult_devices else ""
+                device_stem = f"{device}_" if mult_devices else ""
                 os.makedirs(join(output_dir, model), exist_ok=True)
                 plt.savefig(join(output_dir, model, f"{device_stem}{key}.png"))
                 plt.close()
 
-    if len(results.device_idx.unique()) == 1 and len(results.model.unique()) > 1:
+    if len(results.device.unique()) == 1 and len(results.model.unique()) > 1:
         for key in keys:
             sns.catplot(data=results, y=key, hue=hue, col=col, kind=kind, row="model", sharey=True)
-            device_stem = f"{device_idx}_" if mult_devices else ""
+            device_stem = f"{device}_" if mult_devices else ""
             os.makedirs(join(output_dir, "summary"), exist_ok=True)
             plt.savefig(join(output_dir, "summary", f"summary_{key}.png"))
             plt.close()
@@ -91,10 +91,10 @@ def print_results(
     console.print("\n")
     for model in results.model.unique():
         model_results = results[results.model == model]
-        for device_idx in model_results.device_idx.unique():
+        for device in model_results.device.unique():
             # Create a rich table for each model+device combination
             table = Table(
-                title=f"Model: {model} on Device: {device_idx}",
+                title=f"Model: {model} on Device: {device}",
                 show_header=True,
                 header_style="bold",
                 show_lines=True,
@@ -102,8 +102,10 @@ def print_results(
             )
 
             # Get grouped results
-            device_results = model_results[model_results.device_idx == device_idx]
+            device_results = model_results[model_results.device == device]
+            device_results = device_results.drop(columns=["device"])
             device_results = device_results.groupby(["model", "precision", "batch_size"]).mean()
+            device_results["device"] = device  # Add device column back for display
             print_result = device_results.reset_index()
 
             # Format values for display
@@ -117,8 +119,8 @@ def print_results(
                     print_result[column] = print_result[column].apply(format_seconds)
                 elif "bytes" in column:
                     print_result[column] = print_result[column].apply(format_num, bytes=True)
-                elif column == "device_idx":
-                    print_result[column] = print_result[column].apply(lambda x: f"{int(x)}")
+                elif column == "device":
+                    print_result[column] = print_result[column].apply(lambda x: f"{x}")
 
             # Add columns to the table
             for col in print_result.columns:
