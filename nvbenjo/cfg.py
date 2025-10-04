@@ -8,7 +8,7 @@ from nvbenjo.utils import PrecisionType
 @dataclass
 class ModelConfig:
     name: str = "resnet"
-    type_or_path: str = "wide_resnet101_2"
+    type_or_path: str = "torchvision:wide_resnet101_2"
     kwargs: dict = field(default_factory=dict)
     shape: tuple = ("B", 3, 224, 224)
     num_warmup_batches: int = 5
