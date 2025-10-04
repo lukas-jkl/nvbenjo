@@ -22,6 +22,7 @@ from nvbenjo.utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_d
 
 # TODO: remove verbose
 def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ort.InferenceSession:
+    type_or_path = os.path.expanduser(type_or_path)
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
 

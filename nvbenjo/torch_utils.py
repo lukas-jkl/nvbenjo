@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ty.Any:
+    type_or_path = os.path.expanduser(type_or_path)
     if os.path.isfile(type_or_path):
         if verbose and console is not None:
             console.print(f"Loading torch model {type_or_path}")

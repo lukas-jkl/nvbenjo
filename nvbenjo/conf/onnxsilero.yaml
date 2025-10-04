@@ -5,7 +5,8 @@ defaults:
 nvbenjo:
   models:
       - name: silero
-        type_or_path: /home/lukas/Downloads/silero_model_fp16.onnx
+        # wget https://models.silero.ai/models/tts/en/v3_en_silero_tts_fp16.onnx -O ~/Downloads/silero_model_fp16.onnx
+        type_or_path: ~/Downloads/silero_model_fp16.onnx
         kwargs: {
           providers: ["CUDAExecutionProvider", "CPUExecutionProvider"],
           session_options: {}
