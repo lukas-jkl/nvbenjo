@@ -30,7 +30,12 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
 
     if "providers" not in kwargs:
         if device.type == "cuda":
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            if "CudaExecutionProvider" not in ort.get_available_providers():  # type: ignore
+                raise RuntimeError(
+                    "CudaExecutionProvider is not available in onnxruntime. Please install onnxruntime-gpu or run on CPU."
+                )
+            else:
+                providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         else:
             providers = ["CPUExecutionProvider"]
     else:
@@ -65,13 +70,13 @@ def _sample_gpu_memory(
 def measure_memory_allocation(
     model: ort.InferenceSession, sample: ty.Dict[str, torch.Tensor], device: torch.device, iterations: int = 3
 ) -> int:
-    max_mem = [0]
+    max_mem = [-1]
     stop_event = threading.Event()
 
     # Start memory sampling thread so we can measure peak memory usage in parallel
     sampler = threading.Thread(target=_sample_gpu_memory, args=(device, stop_event, max_mem))
     sampler.start()
-    time.sleep(0.001)  # give sampler some time to start
+    time.sleep(0.01)  # give sampler some time to start
 
     try:
         for _ in range(iterations):
@@ -81,7 +86,7 @@ def measure_memory_allocation(
         sampler.join()
 
     max_mem = max_mem[0]
-    if max_mem == 0:
+    if max_mem == -1:
         raise RuntimeError("Memory measurement failed!")
 
     return max_mem

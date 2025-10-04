@@ -11,5 +11,5 @@ nvbenjo:
         num_warmup_batches: 1
         num_batches: 2
         batch_sizes: [1, 8]
-        device_indices: [0]
+        devices: ["cuda:0"]
         precisions: [FP16, FP32, AMP_FP16]

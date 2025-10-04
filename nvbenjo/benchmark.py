@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import Optional, Callable, Any
+from typing import Any, Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -10,21 +10,19 @@ from rich import progress
 from rich.progress import Progress
 
 import nvbenjo.utils as utils
+from nvbenjo import console, torch_utils
 from nvbenjo.cfg import ModelConfig
-from nvbenjo import console
-
-from nvbenjo import torch_utils
 
 logger = logging.getLogger(__name__)
 
 
-def load_model(type_or_path: str, device: torch.device, **kwargs):
+def load_model(type_or_path: str, device: torch.device, **kwargs) -> tuple[Any, str]:
     if type_or_path.endswith(".onnx"):
         from nvbenjo import onnx_utils
 
-        return onnx_utils.get_model(type_or_path, device=device, **kwargs)
+        return onnx_utils.get_model(type_or_path, device=device, **kwargs), "onnx"
     else:
-        return torch_utils.get_model(type_or_path, device=device, **kwargs)
+        return torch_utils.get_model(type_or_path, device=device, **kwargs), "torch"
 
 
 def _test_load_models(model_cfgs: list[ModelConfig]) -> None:
@@ -32,7 +30,7 @@ def _test_load_models(model_cfgs: list[ModelConfig]) -> None:
     logger.info("Checking if models are valid and available")
     for model_cfg in model_cfgs:
         if model_cfg.type_or_path not in loaded_types:
-            _ = load_model(model_cfg.type_or_path, device=torch.device("cpu"), verbose=True, **model_cfg.kwargs)
+            _, _ = load_model(model_cfg.type_or_path, device=torch.device("cpu"), verbose=True, **model_cfg.kwargs)
             loaded_types.append(model_cfg.type_or_path)
 
 
@@ -122,6 +120,36 @@ def _measure_timings(
     return cur_raw_results
 
 
+def _get_device(model_type: str, device: str, console) -> torch.device:
+    device_chosen = torch.device(device)
+    if device_chosen.type == "cpu":
+        return device_chosen
+    elif device_chosen.type == "cuda":
+        if model_type == "torch":
+            if torch.cuda.is_available():
+                return device_chosen
+            else:
+                console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
+                return torch.device("cpu")
+        if model_type == "onnx":
+            from nvbenjo import onnx_utils
+
+            available_providers = onnx_utils.ort.get_available_providers()  # type: ignore
+            if torch.cuda.is_available() and "CudaExecutionProvider" in available_providers:
+                return device_chosen
+            else:
+                if torch.cuda.is_available():
+                    console.print(
+                        "[yellow]CudaExecutionProvider is not available in onnxruntime. Running on CPU.[/yellow]"
+                    )
+                else:
+                    console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
+                return torch.device("cpu")
+    else:
+        raise ValueError(f"Invalid device {device}. Must be one of cpu or cuda")
+    return device_chosen
+
+
 def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = None) -> pd.DataFrame:
     results = []
     num_model_parameters = None
@@ -130,28 +158,23 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
     if progress_bar is None:
         progress_bar = _get_progress_bar()
     console = progress_bar.console
-    model = load_model(model_cfg.type_or_path, device=torch.device("cpu"), **model_cfg.kwargs)
+    _, model_type = load_model(model_cfg.type_or_path, device=torch.device("cpu"), **model_cfg.kwargs)
 
-    iter_cfgs = list(itertools.product(*[model_cfg.device_indices, model_cfg.batch_sizes, model_cfg.precisions]))
+    iter_cfgs = list(itertools.product(*[model_cfg.devices, model_cfg.batch_sizes, model_cfg.precisions]))
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
-    for device_idx, batch_size, precision in iter_cfgs:
+    for device, batch_size, precision in iter_cfgs:
         if precision_batch_oom.get(precision, np.inf) < batch_size:
             # already went oom for this precision with smaller batch size -> skip bigger one
             progress_bar.advance(bench_task)
             continue
         try:
-            if torch.cuda.is_available():
-                device = torch.device(f"cuda:{device_idx}")
-            else:
-                console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
-                device = torch.device("cpu")
-
+            device = _get_device(model_type, device, console)
             progress_bar.update(
                 bench_task, description=f"  Device {device} | batch-size: {batch_size} | {precision.name}"
             )
 
-            model = load_model(model_cfg.type_or_path, device=device, **model_cfg.kwargs)
-            if isinstance(model, nn.Module):
+            model, model_type = load_model(model_cfg.type_or_path, device=device, **model_cfg.kwargs)
+            if model_type == "torch":
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 
                 if num_model_parameters is None:
@@ -174,7 +197,7 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
                         progress_bar,
                         timing_function=torch_utils.measure_repeated_inference_timing,
                     )
-            else:
+            elif model_type == "onnx":
                 from nvbenjo import onnx_utils
 
                 batch = onnx_utils.get_rnd_input_batch(model.get_inputs(), model_cfg.shape, batch_size)
@@ -194,16 +217,18 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
                     progress_bar,
                     timing_function=onnx_utils.measure_repeated_inference_timing,
                 )
+            else:
+                raise ValueError(f"Unknown model type {model_type}")
 
             cur_results["memory_bytes"] = memory_alloc
             cur_results["model"] = model_cfg.name
             cur_results["batch_size"] = batch_size
             cur_results["precision"] = precision.value
-            cur_results["device_idx"] = device_idx
+            cur_results["device_idx"] = device.index if device.index is not None else -1
             results.append(cur_results)
         except torch.cuda.OutOfMemoryError:
             console.print(
-                f"[red]Out of memory for batch size {batch_size} and precision {precision} on device {device_idx}[/red]"
+                f"[red]Out of memory for batch size {batch_size} and precision {precision} on device {str(device)}[/red]"
             )
             precision_batch_oom[precision] = batch_size
             continue

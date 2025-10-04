@@ -45,7 +45,7 @@ def test_onnx():
                                 "type_or_path": tmpfile.name,
                                 "num_batches": 2,
                                 "batch_sizes": [1, 2],
-                                "device_indices": [0],
+                                "devices": ["cpu"],
                                 "shape": [
                                     {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
                                     {"name": "y", "shape": ["B", 20], "min_max": [min, max]},

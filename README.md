@@ -1,5 +1,6 @@
 # Nvbenjo
 
+[![Nox](https://img.shields.io/badge/%F0%9F%A6%8A-Nox-D85E00.svg)](https://github.com/wntrblm/nox)
 ![Ruff](https://github.com/lukas-jkl/nvbenjo/actions/workflows/ruff.yml/badge.svg)
 ![Tests](https://github.com/lukas-jkl/nvbenjo/actions/workflows/test.yml/badge.svg)
 

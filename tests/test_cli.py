@@ -159,6 +159,11 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
 
 @pytest.mark.parametrize("export_type", ["torchexport", "torchsave", "torchscript"])
 def test_torch_load_complex_multiinput(export_type):
+    if export_type == "torchexport" and torch.__version__ < "2.1":
+        pytest.skip("torch.export is only available in PyTorch 2.1 and later")
+    else:
+        pytest.skip("torch.export is only available in PyTorch 2.1 and later")
+
     min = 12
     max = 34
     model = ComplexDummyModelMultiInput(min=min, max=max)
@@ -192,7 +197,7 @@ def test_torch_load_complex_multiinput(export_type):
                                 "type_or_path": tmpfile.name,
                                 "num_batches": 2,
                                 "batch_sizes": [1, 2],
-                                "device_indices": [0],
+                                "devices": ["cpu"],
                                 "precisions": ["FP32", "FP16", "AMP_FP16"],
                                 "shape": [
                                     {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
@@ -238,7 +243,7 @@ def test_torch_load_complex_invalid_multiinput():
                                 "type_or_path": tmpfile.name,
                                 "num_batches": 2,
                                 "batch_sizes": [1, 2],
-                                "device_indices": [0],
+                                "devices": ["cpu"],
                                 "precisions": ["FP32"],
                                 "shape": [
                                     {"name": "x", "shape": ["B", 10], "type": "float", "min_max": [max, max * 2]},

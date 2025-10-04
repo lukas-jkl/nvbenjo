@@ -23,11 +23,17 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
             console.print(f"Loading torch model {type_or_path}")
         try:
             return torch.load(type_or_path, map_location=device, weights_only=False)
-        except RuntimeError:
-            program = torch.export.load(type_or_path)
-            module = program.module()
-            module = module.to(device)
-            return module
+        except Exception:
+            try:
+                return torch.jit.load(type_or_path, map_location=device)
+            except Exception:
+                if torch.__version__ > "2.1":
+                    program = torch.export.load(type_or_path)
+                    module = program.module()
+                    module = module.to(device)
+                    return module
+                else:
+                    raise
 
     if type_or_path.startswith("huggingface:"):
         type_or_path = type_or_path[len("huggingface:") :]

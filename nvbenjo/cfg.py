@@ -14,7 +14,7 @@ class ModelConfig:
     num_warmup_batches: int = 5
     num_batches: int = 50
     batch_sizes: ty.Tuple = (16, 32)
-    device_indices: ty.Tuple[int] = (0,)
+    devices: ty.Tuple[str] = ("cpu",)
     precisions: ty.Tuple[PrecisionType, ...] = (PrecisionType.FP32, PrecisionType.FP16, PrecisionType.AMP)
 
 

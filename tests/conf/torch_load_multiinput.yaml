@@ -16,7 +16,7 @@ nvbenjo:
     batch_sizes:
     - 1
     - 2
-    device_indices:
-    - 0
+    devices:
+    - "cpu"
     precisions:
     - FP32
