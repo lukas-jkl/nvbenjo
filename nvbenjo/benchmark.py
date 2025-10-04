@@ -223,6 +223,9 @@ def benchmark_model(
                         timing_function=torch_utils.measure_repeated_inference_timing,
                     )
             elif model_type == "onnx":
+                if utils.AMP_PREFIX in precision.value:
+                    raise ValueError(f"ONNX models do not support AMP precision {precision}")                    
+
                 from nvbenjo import onnx_utils
 
                 batch = onnx_utils.get_rnd_input_batch(model.get_inputs(), model_cfg.shape, batch_size)
