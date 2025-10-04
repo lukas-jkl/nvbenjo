@@ -1,0 +1,32 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+      - name: resnet50
+        type_or_path: torchvision:resnet50
+        shape: [B, 3, 224, 224]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        precisions: [FP32, AMP_FP16, AMP_BFLOAT16]
+
+      - name: vit-base-patch16-224
+        type_or_path: torchvision:vit_b_16
+        shape: [B, 3, 224, 224]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        precisions: [FP32, AMP_FP16, AMP_BFLOAT16]
+
+      - name: alexnet
+        type_or_path: torchvision:alexnet
+        shape: [B, 3, 224, 224]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        precisions: [FP32, AMP_FP16, AMP_BFLOAT16]

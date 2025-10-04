@@ -9,10 +9,11 @@ nvbenjo:
         kwargs: {}
         shape: [{"name": "input_ids", "shape": [B, 200], "type": "long", min_max: [0, 200]}]
         num_warmup_batches: 1
-        num_batches: 2
+        num_batches: 10
         batch_sizes: [8, 16, 32]
         devices: ["cuda:0"]
         precisions: [FP16, FP32, AMP_FP16]
+
       - name: gpt2
         type_or_path: huggingface:openai-community/gpt2
         kwargs: {}
@@ -22,6 +23,55 @@ nvbenjo:
         batch_sizes: [16, 32]
         devices: ["cuda:0"]
         precisions: [BFLOAT16, FP32]
+
+      - name: ast-audioset
+        type_or_path: huggingface:MIT/ast-finetuned-audioset-10-10-0.4593
+        kwargs: {}
+        shape: [{"name": "input_values", "shape": [B, 1024, 128], "type": "float", "min_max": [0, 1]}]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8]
+        devices: ["cuda:0"]
+        precisions: [FP32, AMP_FP16]
+
+      - name: openai/whisper-small
+        type_or_path: huggingface:openai/whisper-small
+        kwargs: {}
+        shape: [
+            {"name": "input_features", "shape": [B, 80, 3000], "min_max": [0, 1]},
+            {"name": "decoder_input_ids", "shape": [B, 6], "value": 50258, "type": "long"},
+            {"name": "attention_mask", "shape": [B, 6], "value": 1, "type": "long"},
+          ]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 4, 8]
+        devices: ["cuda:0"]
+        precisions: [FP16]
+
+      - name: google/t5
+        type_or_path: huggingface:google/t5-v1_1-small
+        kwargs: {}
+        shape: [
+            {"name": "input_ids", "shape": [B, 512], "type": "long", "min_max": [0, 32128]},
+            {"name": "attention_mask", "shape": [B, 512], "type": "long", "value": 1},
+            {"name": "decoder_input_ids", "shape": [B, 8], "type": "long", "value": 0},
+          ]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        precisions: [FP16, FP32]
+
+      - name: mobilevit
+        type_or_path: huggingface:apple/mobilevit-small
+        kwargs: {}
+        shape: [{"name": "pixel_values", "shape": [B, 3, 224, 224], "type": "float", "min_max": [0, 1]}]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        precisions: [FP32, AMP_FP16, AMP_BFLOAT16]
+
       # - name: llama
       #   type_or_path: huggingface:openlm-research/open_llama_7b
       #   kwargs: {}
