@@ -224,7 +224,7 @@ def benchmark_model(
                     )
             elif model_type == "onnx":
                 if utils.AMP_PREFIX in precision.value:
-                    raise ValueError(f"ONNX models do not support AMP precision {precision}")                    
+                    raise ValueError(f"ONNX models do not support AMP precision {precision}")
 
                 from nvbenjo import onnx_utils
 

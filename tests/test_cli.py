@@ -159,9 +159,7 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
 
 @pytest.mark.parametrize("export_type", ["torchexport", "torchsave", "torchscript"])
 def test_torch_load_complex_multiinput(export_type):
-    if export_type == "torchexport" and torch.__version__ < "2.1":
-        pytest.skip("torch.export is only available in PyTorch 2.1 and later")
-    else:
+    if export_type == "torchexport":
         pytest.skip("torch.export is only available in PyTorch 2.1 and later")
 
     min = 12
@@ -207,6 +205,10 @@ def test_torch_load_complex_multiinput(export_type):
                         ]
                     }
                 }
+                if torch.__version__ < "2.2":
+                    config_override["nvbenjo"]["models"][0]["precisions"].remove("AMP_FP16")
+                    config_override["nvbenjo"]["models"][0]["precisions"].remove("FP16")
+
                 if export_type == "torchexport":
                     # torchexport does not work with named inputs
                     config_override["nvbenjo"]["models"][0]["shape"] = [

@@ -32,7 +32,7 @@ def test_onnx():
                 f=tmpfile.name,
                 input_names=["x", "y"],
                 output_names=["output"],
-                opset_version=18,
+                opset_version=17,
             )
             min, max = 0, 5
 
