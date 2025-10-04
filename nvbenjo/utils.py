@@ -56,12 +56,20 @@ def format_seconds(time_seconds: float) -> str:
             return f"{time_us:.3f} us"
 
 
-def _get_rnd(shape: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int) -> torch.Tensor:
+def _get_rnd(
+    shape: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int, value: ty.Optional[ty.Any] = None
+) -> torch.Tensor:
     if dtype is None or any(s in dtype for s in ["float", "double"]):
         dtype = dtype if dtype is not None else "float32"
-        rnd = torch.distributions.Uniform(min_val, max_val).sample(shape).to(dtype=getattr(torch, dtype))
+        if value:
+            rnd = torch.full(size=shape, fill_value=value, dtype=getattr(torch, dtype))
+        else:
+            rnd = torch.distributions.Uniform(min_val, max_val).sample(shape).to(dtype=getattr(torch, dtype))
     elif any(s in dtype for s in ["int", "long"]):
-        rnd = torch.randint(low=int(min_val), high=int(max_val), size=shape, dtype=getattr(torch, dtype))
+        if value:
+            rnd = torch.full(size=shape, fill_value=value, dtype=getattr(torch, dtype))
+        else:
+            rnd = torch.randint(low=int(min_val), high=int(max_val), size=shape, dtype=getattr(torch, dtype))
     else:
         raise ValueError(f"Invalid dtype {dtype}. Must be one of int, long, float, double")
     return rnd
@@ -75,8 +83,10 @@ def check_shape_dict(si: dict) -> None:
     if "shape" not in si:
         raise ValueError(f"The shape definition {si} must contain a 'shape' key.")
     for k in si.keys():
-        if k not in ["name", "type", "shape", "min_max"]:
+        if k not in ["name", "type", "shape", "min_max", "value"]:
             raise ValueError(f"Invalid key {k} in shape definition {si}.")
+    if "min_max" in si.keys() and "value" in si.keys():
+        raise ValueError(f"Invalid shape definition {si} can only specify min_max or value.")
 
 
 def get_rnd_from_shape_s(
@@ -113,6 +123,7 @@ def get_rnd_from_shape_s(
                     dtype=si.get("type", dtype),
                     min_val=si.get("min_max", (min_val, max_val))[0],
                     max_val=si.get("min_max", (min_val, max_val))[1],
+                    value=si.get("value", None),
                 )
         else:
             raise ValueError(

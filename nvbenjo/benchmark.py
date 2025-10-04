@@ -184,6 +184,7 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
                 # maybe use a onnx util instead that only applies to batch and respects which types are possible?
                 # maybe we can check automatically if model supports fp16/bf16
                 batch = torch_utils.apply_batch_precision(batch, precision=precision)
+                memory_alloc = onnx_utils.measure_memory_allocation(model, batch, device)
                 cur_results = _measure_timings(
                     model,
                     batch,

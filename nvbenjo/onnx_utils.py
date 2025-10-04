@@ -1,5 +1,7 @@
 import os
 import time
+import nvitop
+import threading
 import typing as ty
 
 import onnxruntime as ort
@@ -12,6 +14,7 @@ from nvbenjo.torch_utils import transfer_to_device
 from nvbenjo.utils import EXAMPLE_VALID_SHAPES, check_shape_dict, get_rnd_from_shape_s
 
 
+#TODO: remove verbose
 def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ort.InferenceSession:
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
@@ -25,9 +28,62 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
         else:
             providers = ["CPUExecutionProvider"]
         kwargs["providers"] = providers
+    else:
+        providers = kwargs.pop("providers")
 
-    sess = ort.InferenceSession(type_or_path, **kwargs)
+    session_options = ort.SessionOptions() # type: ignore
+    session_options.log_severity_level = 3
+    # session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    provider_options = kwargs.get("provider_options", None)
+
+    sess = ort.InferenceSession(
+        type_or_path, sess_options=session_options, providers=providers, provider_options=provider_options, **kwargs
+    )
     return sess
+
+
+def _sample_gpu_memory(device: torch.device, stop_event: threading.Event, max_mem: ty.List[int], sample_time_s: float = 0.010):
+    if device.type == "cuda":
+        gpu = nvitop.Device(device.index)
+    else:
+        max_mem[0] = 1
+    while not stop_event.is_set():
+        if device.type == "cuda":
+            mem = gpu.memory_used()
+            if isinstance(mem, int) and mem > max_mem[0]:
+                max_mem[0] = mem
+        time.sleep(sample_time_s)
+
+
+def measure_memory_allocation(
+    model: ort.InferenceSession, sample: ty.Dict[str, torch.Tensor], device: torch.device, iterations: int = 3
+) -> int:
+    max_mem = [0]
+    stop_event = threading.Event()
+
+    # Start memory sampling thread so we can measure peak memory usage in parallel
+    sampler = threading.Thread(target=_sample_gpu_memory, args=(device, stop_event, max_mem))
+    sampler.start()
+
+    try:
+        for _ in range(iterations):
+            _ = model.run(None, {n: d.cpu().numpy() for n, d in sample.items()})
+    finally:
+        stop_event.set()
+        sampler.join()
+
+    max_mem = max_mem[0]
+    if max_mem == 0:
+        raise RuntimeError("Memory measurement failed! Did receive 0 maybe the model runtime was too short.")
+
+    return max_mem
+
+
+def _get_formated_input_info(onnx_inputs) -> str:
+    return "\n".join(
+        f"- name: {onnx_input.name}, dtype: {onnx_input.type}, shape: {onnx_input.shape}{', default: ' + str(onnx_input.value) if hasattr(onnx_inputs, 'value') else ''}"
+        for onnx_input in onnx_inputs
+    )
 
 
 def get_rnd_input_batch(onnx_session_inputs, shape: tuple, batch_size: int) -> ty.Dict[str, torch.Tensor]:
@@ -40,7 +96,8 @@ def get_rnd_input_batch(onnx_session_inputs, shape: tuple, batch_size: int) -> t
         # simple shape e.g. (B, 3, 224, 224)
         if len(onnx_session_inputs) != 1:
             raise ValueError(
-                "The model has multiple inputs, but the provided shape is a single shape. Please provide a list of shapes or a dict of shapes."
+                "The model has multiple inputs, but the provided shape is a single shape."
+                f"Model Inputs: \n{_get_formated_input_info(onnx_session_inputs)}"
             )
         model_input = onnx_session_inputs[0]
         rnd_shape = ({"name": model_input.name, "type": strip_type_string(model_input.type), "shape": shape},)
@@ -48,7 +105,8 @@ def get_rnd_input_batch(onnx_session_inputs, shape: tuple, batch_size: int) -> t
         # tuple of shapes e.g. ((B, 3, 224, 224), (B, 10))
         if len(onnx_session_inputs) != len(shape):
             raise ValueError(
-                f"The model has {len(onnx_session_inputs)} inputs, but the provided shape has {len(shape)} shapes. Please provide a list of shapes or a dict of shapes."
+                f"The model has {len(onnx_session_inputs)} inputs, but the provided input has {len(shape)} shapes. Please provide a list of shapes or a dict of shapes."
+                f"Model Inputs: \n{_get_formated_input_info(onnx_session_inputs)}"
             )
         rnd_shape = tuple(
             {"name": model_input.name, "type": strip_type_string(model_input.type), "shape": si}
@@ -59,14 +117,16 @@ def get_rnd_input_batch(onnx_session_inputs, shape: tuple, batch_size: int) -> t
         rnd_shape = tuple(dict(si) for si in shape)  # convert from DictConfig to dict
         if len(onnx_session_inputs) != len(shape):
             raise ValueError(
-                f"The model has {len(onnx_session_inputs)} inputs, but the provided shape has {len(shape)} shapes. Please provide a list of shapes or a dict of shapes."
+                f"The model has {len(onnx_session_inputs)} inputs, but the provided input has {len(shape)} shapes. Please provide a list of shapes or a dict of shapes."
+                f"Model Inputs: \n{_get_formated_input_info(onnx_session_inputs)}"
             )
         for si in rnd_shape:
             check_shape_dict(si)
             # # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
             if si["name"] not in onnx_inputs_by_name:
                 raise ValueError(
-                    f"The model does not have an input named {si['name']}. Available inputs are: {list(onnx_inputs_by_name.keys())}"
+                    f"The model does not have an input named {si['name']}."
+                    f"Model Inputs: \n{_get_formated_input_info(onnx_session_inputs)}"
                 )
             if "type" not in si:
                 si["type"] = strip_type_string(onnx_inputs_by_name[si["name"]].type)
@@ -109,16 +169,11 @@ def measure_repeated_inference_timing(
         "tensor(bool)": torch.bool,
     }
 
-    # TODO: !! just run without io mapping first so we get the correct shapes?
-    # TODO:; Make this work for multiple inputs
-    # TODO: !! need to support auto-dedetcint
     onnx_model_outputs = model.get_outputs()
 
     # run model once so we know the output shapes
     outputs = model.run(None, {n: d.cpu().numpy() for n, d in sample.items()})
-    output_shapes = {}
-    for onnx_output, output_shape in zip(onnx_model_outputs, outputs):
-        output_shapes[onnx_output.name] = output_shape.shape
+    output_shapes = {onnx_output.name: output_shape.shape for onnx_output, output_shape in zip(onnx_model_outputs, outputs)}
     del outputs
 
     for _ in range(num_runs):
