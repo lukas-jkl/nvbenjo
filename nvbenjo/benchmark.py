@@ -237,6 +237,10 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
             else:
                 raise ValueError(f"Unknown model type {model_type}")
 
+            del model
+            del batch
+            torch.cuda.empty_cache()
+
             cur_results["memory_bytes"] = memory_alloc
             cur_results["model"] = model_cfg.name
             cur_results["batch_size"] = batch_size
