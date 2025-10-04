@@ -30,8 +30,8 @@ def test_python(session, torch):
 
 
 @nox.session(name="test-torch", venv_backend="uv")
-@nox.parametrize("python", ["3.12"])
-@nox.parametrize("torch", ["2.1.1", "2.8.0"])
+@nox.parametrize("python", ["3.11"])
+@nox.parametrize("torch", ["2.4", "2.6", "2.8.0"])
 def test_torch(session, torch):
     pyproject = nox.project.load_toml("pyproject.toml")
     session.install(
