@@ -30,9 +30,9 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
 
     if "providers" not in kwargs:
         if device.type == "cuda":
-            if "CudaExecutionProvider" not in ort.get_available_providers():  # type: ignore
+            if "CUDAExecutionProvider" not in ort.get_available_providers():  # type: ignore
                 raise RuntimeError(
-                    "CudaExecutionProvider is not available in onnxruntime. Please install onnxruntime-gpu or run on CPU."
+                    "CUDAExecutionProvider is not available in onnxruntime. Please install onnxruntime-gpu or run on CPU."
                 )
             else:
                 providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
