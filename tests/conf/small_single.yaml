@@ -4,9 +4,8 @@ defaults:
   - _self_ 
 
 nvbenjo:
-  enable: true
-  measure_memory: true
-  torch_profile: false
+  measure_memory: false
+  profile: false
   models:
   - name: shufflenet
     type_or_path: torchvision:shufflenet_v2_x0_5

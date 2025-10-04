@@ -34,7 +34,9 @@ def _test_load_models(model_cfgs: list[ModelConfig]) -> None:
             loaded_types.append(model_cfg.type_or_path)
 
 
-def benchmark_models(model_cfgs: list[ModelConfig]) -> pd.DataFrame:
+def benchmark_models(
+    model_cfgs: list[ModelConfig], measure_memory: Optional[bool] = True, profile: Optional[bool] = False
+) -> pd.DataFrame:
     _test_load_models(model_cfgs)
 
     with _get_progress_bar() as progress_bar:
@@ -43,7 +45,9 @@ def benchmark_models(model_cfgs: list[ModelConfig]) -> pd.DataFrame:
 
         for model_cfg in model_cfgs:
             progress_bar.update(model_task, description=f"Benchmarking {model_cfg.name}")
-            model_results = benchmark_model(model_cfg, progress_bar)
+            model_results = benchmark_model(
+                model_cfg, progress_bar=progress_bar, measure_memory=measure_memory, profile=profile
+            )
             results.append(model_results)
             progress_bar.advance(model_task)
 
@@ -154,10 +158,18 @@ def _get_device(model_type: str, device: str, console) -> torch.device:
     return device_chosen
 
 
-def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = None) -> pd.DataFrame:
+def benchmark_model(
+    model_cfg: ModelConfig,
+    profile: Optional[bool] = False,
+    measure_memory: Optional[bool] = True,
+    progress_bar: Optional[Progress] = None,
+) -> pd.DataFrame:
     results = []
     num_model_parameters = None
     precision_batch_oom = {}
+
+    if profile:
+        raise NotImplementedError("Profiling is not yet implemented.")
 
     if progress_bar is None:
         progress_bar = _get_progress_bar()
@@ -197,7 +209,10 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
 
                 with torch_utils.get_amp_ctxt_for_precision(precision=precision, device=device):
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
-                    memory_alloc = torch_utils.measure_memory_allocation(model, batch, device)
+                    if measure_memory:
+                        memory_alloc = torch_utils.measure_memory_allocation(model, batch, device)
+                    else:
+                        memory_alloc = 0
                     cur_results = _measure_timings(
                         model,
                         batch,
@@ -224,7 +239,10 @@ def benchmark_model(model_cfg: ModelConfig, progress_bar: Optional[Progress] = N
                         k: torch_utils.apply_batch_precision(v, precision=precision) if not set_dtype[k] else v
                         for k, v in batch.items()
                     }
-                memory_alloc = onnx_utils.measure_memory_allocation(model, batch, device)
+                if measure_memory:
+                    memory_alloc = onnx_utils.measure_memory_allocation(model, batch, device)
+                else:
+                    memory_alloc = 0
                 cur_results = _measure_timings(
                     model,
                     batch,

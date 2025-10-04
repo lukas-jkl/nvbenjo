@@ -3,9 +3,8 @@ defaults:
   - _self_
 
 nvbenjo:
-  enable: true
   measure_memory: true
-  torch_profile: false
+  profile: false
   models:
   - name: dummytorchmodel
     type_or_path: replaceme

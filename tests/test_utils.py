@@ -1,12 +1,7 @@
 import pytest
 import torch
 
-from nvbenjo.utils import (
-    EXAMPLE_VALID_SHAPES,
-    format_num,
-    format_seconds,
-    get_rnd_from_shape_s,
-)
+from nvbenjo.utils import EXAMPLE_VALID_SHAPES, format_num, format_seconds, get_rnd_from_shape_s, NoBatchShapeError
 
 
 def test_format_seconds():
@@ -31,6 +26,18 @@ def test_format_num():
 def test_get_rnd_shape_examples():
     for example_shape in EXAMPLE_VALID_SHAPES:
         _ = get_rnd_from_shape_s(example_shape, batch_size=12)
+    _ = get_rnd_from_shape_s(({"name": "input1", "type": "float", "shape": ("B", 6), "value": 1},), batch_size=12)
+    with pytest.raises(NoBatchShapeError, match="Please ensure that the shape contains an identifier"):
+        _ = get_rnd_from_shape_s(
+            ({"name": "input1", "type": "float", "shape": (6,), "value": [1, 2, 3, 4, 5, 6]},), batch_size=12
+        )
+    _ = get_rnd_from_shape_s(
+        (
+            {"name": "input1", "type": "float", "shape": (6,), "value": [1, 2, 3, 4, 5, 6]},
+            {"name": "input1", "type": "float", "shape": (6, "B"), "value": 1},
+        ),
+        batch_size=12,
+    )
 
 
 def test_get_rnd_shape_invalid():

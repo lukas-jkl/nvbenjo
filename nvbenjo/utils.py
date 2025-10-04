@@ -27,6 +27,10 @@ EXAMPLE_VALID_SHAPES: ty.List[Shape] = [
 AMP_PREFIX = "amp"
 
 
+class NoBatchShapeError(ValueError):
+    pass
+
+
 class PrecisionType(Enum):
     AMP = f"{AMP_PREFIX}"
     AMP_FP16 = f"{AMP_PREFIX}_fp16"
@@ -145,10 +149,12 @@ def get_rnd_from_shape_s(
             )
 
         if not depends_on_batch:
-            raise ValueError(
+            raise NoBatchShapeError(
                 f"Shape {shape} does not depend on batch size. "
                 f"Please ensure that the shape contains an identifier for the batch size: {BATCH_SIZE_IDENTIFIERS}."
             )
+    except NoBatchShapeError as e:
+        raise e
     except Exception as e:
         raise ValueError(
             f"Failed to generate random input from shape {shape} with batch size {batch_size}. "
