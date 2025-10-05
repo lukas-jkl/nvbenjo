@@ -1,0 +1,22 @@
+app_name: Nvbenjo
+
+header: |
+  == Nvbenjo ==
+  A benchmarking tool for ML models.
+
+footer: |-
+  Powered by Hydra (https://hydra.cc)
+  For more info, see the docs.
+
+template: |-
+  ${hydra.help.header}
+
+  Use it to benchmark your pytorch or onnx models.
+
+  == Available Config Groups ==
+  $APP_CONFIG_GROUPS
+
+  == Current Config ==
+  $CONFIG
+
+  ${hydra.help.footer}
