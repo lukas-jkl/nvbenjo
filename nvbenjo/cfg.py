@@ -1,12 +1,31 @@
 import typing as ty
 from dataclasses import dataclass, field
+from abc import ABC
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf, open_dict
 from nvbenjo.utils import PrecisionType
+from hydra.utils import instantiate
+from contextlib import nullcontext
 
 
 @dataclass
-class ModelConfig:
+class TorchRuntimeConfig:
+    compile: bool = False
+    compile_kwargs: dict = field(default_factory=dict)
+    precision: PrecisionType = PrecisionType.FP32
+
+
+@dataclass
+class OnnxRuntimeConfig:
+    execution_providers: ty.Tuple[str, ...] = ("CPUExecutionProvider",)
+    graph_optimization_level: int = 99  # ORT_ENABLE_ALL
+    intra_op_num_threads: ty.Optional[int] = None
+    inter_op_num_threads: ty.Optional[int] = None
+    log_severity_level: int = 2  # Warning
+
+
+@dataclass
+class BaseModelConfig(ABC):
     name: str = "resnet"
     type_or_path: str = "torchvision:wide_resnet101_2"
     kwargs: dict = field(default_factory=dict)
@@ -15,14 +34,35 @@ class ModelConfig:
     num_batches: int = 50
     batch_sizes: ty.Tuple = (16, 32)
     devices: ty.Tuple[str] = ("cpu",)
-    precisions: ty.Tuple[PrecisionType, ...] = (PrecisionType.FP32, PrecisionType.FP16, PrecisionType.AMP)
+    runtime_options: ty.Dict[str, ty.Any] = field(default_factory=dict)
+
+
+@dataclass
+class TorchModelConfig(BaseModelConfig):
+    model_kwargs: dict = field(default_factory=dict)
+    runtime_options: ty.Dict[str, TorchRuntimeConfig] = field(default_factory=lambda: {"default": TorchRuntimeConfig()})
+
+    def __post_init__(self):
+        for i, (key, opt) in enumerate(self.runtime_options.items()):
+            if isinstance(opt, DictConfig):
+                self.runtime_options[key] = OmegaConf.structured(TorchRuntimeConfig(**OmegaConf.to_container(opt)))
+
+
+@dataclass
+class OnnxModelConfig(BaseModelConfig):
+    runtime_options: ty.Dict[str, OnnxRuntimeConfig] = field(default_factory=lambda: {"default": OnnxRuntimeConfig()})
+
+    def __post_init__(self):
+        for i, (key, opt) in enumerate(self.runtime_options.items()):
+            if isinstance(opt, DictConfig):
+                self.runtime_options[key] = OmegaConf.structured(OnnxRuntimeConfig(**OmegaConf.to_container(opt)))
 
 
 @dataclass
 class NvbenjoConfig:
     measure_memory: bool = True
     profile: bool = False
-    models: ty.List[ModelConfig] = field(default_factory=lambda: [ModelConfig()])
+    models: ty.Dict[str, ty.Any] = field(default_factory=lambda: dict())
 
 
 @dataclass
@@ -31,9 +71,16 @@ class BenchConfig:
     output_dir: ty.Optional[str] = None
 
 
-def check_config(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
-    model_names = [model.name for model in cfg.nvbenjo.models]
-    duplicates = set([x for x in model_names if model_names.count(x) > 1])
-    if duplicates:
-        raise ValueError(f"Duplicate model names found: {duplicates}. Please ensure all model names are unique.")
-    return
+def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> ty.Dict[str, BaseModelConfig]:
+    models = {}
+    for model_name, model in cfg.nvbenjo.models.items():
+        ctxt = open_dict(model) if isinstance(model, DictConfig) else nullcontext()
+        if "_target_" not in model:
+            with ctxt:
+                if model["type_or_path"].endswith(".onnx"):
+                    cfg.nvbenjo.models[model_name]["_target_"] = "nvbenjo.cfg.OnnxModelConfig"
+                else:
+                    cfg.nvbenjo.models[model_name]["_target_"] = "nvbenjo.cfg.TorchModelConfig"
+        models[model_name] = instantiate(model) if isinstance(model, DictConfig) else model
+
+    return models

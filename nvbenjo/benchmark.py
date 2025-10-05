@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Dict
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ from rich.progress import Progress
 
 import nvbenjo.utils as utils
 from nvbenjo import console, torch_utils
-from nvbenjo.cfg import ModelConfig
+from nvbenjo.cfg import BaseModelConfig, TorchModelConfig, OnnxModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +25,17 @@ def load_model(type_or_path: str, device: torch.device, **kwargs) -> tuple[Any, 
         return torch_utils.get_model(type_or_path, device=device, **kwargs), "torch"
 
 
-def _test_load_models(model_cfgs: list[ModelConfig]) -> None:
+def _test_load_models(model_cfgs: Dict[str, BaseModelConfig]) -> None:
     loaded_types = []
     logger.info("Checking if models are valid and available")
-    for model_cfg in model_cfgs:
+    for _, model_cfg in model_cfgs.items():
         if model_cfg.type_or_path not in loaded_types:
             _, _ = load_model(model_cfg.type_or_path, device=torch.device("cpu"), verbose=True, **model_cfg.kwargs)
             loaded_types.append(model_cfg.type_or_path)
 
 
 def benchmark_models(
-    model_cfgs: list[ModelConfig], measure_memory: Optional[bool] = True, profile: Optional[bool] = False
+    model_cfgs: Dict[str, BaseModelConfig], measure_memory: Optional[bool] = True, profile: Optional[bool] = False
 ) -> pd.DataFrame:
     _test_load_models(model_cfgs)
 
@@ -43,11 +43,12 @@ def benchmark_models(
         model_task = progress_bar.add_task("Benchmarking models", total=len(model_cfgs))
         results = []
 
-        for model_cfg in model_cfgs:
-            progress_bar.update(model_task, description=f"Benchmarking {model_cfg.name}")
+        for model_name, model_cfg in model_cfgs.items():
+            progress_bar.update(model_task, description=f"Benchmarking {model_name}")
             model_results = benchmark_model(
                 model_cfg, progress_bar=progress_bar, measure_memory=measure_memory, profile=profile
             )
+            model_results["model"] = model_name
             results.append(model_results)
             progress_bar.advance(model_task)
 
@@ -158,8 +159,9 @@ def _get_device(model_type: str, device: str, console) -> torch.device:
     return device_chosen
 
 
+# TODO: !! two seperate functions torch and onnx
 def benchmark_model(
-    model_cfg: ModelConfig,
+    model_cfg: BaseModelConfig,
     profile: Optional[bool] = False,
     measure_memory: Optional[bool] = True,
     progress_bar: Optional[Progress] = None,
@@ -176,38 +178,47 @@ def benchmark_model(
     console = progress_bar.console
     _, model_type = load_model(model_cfg.type_or_path, device=torch.device("cpu"), **model_cfg.kwargs)
 
-    iter_cfgs = list(itertools.product(*[model_cfg.devices, model_cfg.batch_sizes, model_cfg.precisions]))
+    iter_cfgs = list(itertools.product(*[model_cfg.devices, model_cfg.batch_sizes, model_cfg.runtime_options.items()]))
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
-    for device, batch_size, precision in iter_cfgs:
-        if precision_batch_oom.get(precision, np.inf) < batch_size:
+    for device, batch_size, (runtime_option_name, runtime_cfg) in iter_cfgs:
+        if precision_batch_oom.get(runtime_option_name, np.inf) < batch_size:
             # already went oom for this precision with smaller batch size -> skip bigger one
             progress_bar.advance(bench_task)
             continue
         try:
             device = _get_device(model_type, device, console)
             progress_bar.update(
-                bench_task, description=f"  Device {device} | batch-size: {batch_size} | {precision.name}"
+                bench_task, description=f"  Device {device} | batch-size: {batch_size} | {runtime_option_name}"
             )
 
             model, model_type = load_model(model_cfg.type_or_path, device=device, **model_cfg.kwargs)
-            if model_type == "torch":
+            if isinstance(model_cfg, TorchModelConfig):
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 
                 if num_model_parameters is None:
                     num_model_parameters = torch_utils.get_model_parameters(model)
 
-                model = torch_utils.apply_non_amp_model_precision(model, precision=precision)
+                model = torch_utils.apply_non_amp_model_precision(
+                    model, precision=model_cfg.runtime_options[runtime_option_name].precision
+                )
+                if runtime_cfg.compile:
+                    model = torch.compile(model, **runtime_cfg.compile_kwargs)  # type: ignore
+
+                if not isinstance(model, nn.Module):
+                    raise ValueError(f"Expected a torch.nn.Module but got {type(model)}")
 
                 # only apply precision to input if no precision is specified
                 if not set_dtype:
-                    batch = torch_utils.apply_batch_precision(batch, precision=precision)
+                    batch = torch_utils.apply_batch_precision(batch, precision=runtime_cfg.precision)
                 else:
                     batch = {
-                        k: torch_utils.apply_batch_precision(v, precision=precision) if not set_dtype[k] else v
+                        k: torch_utils.apply_batch_precision(v, precision=runtime_cfg.precision)
+                        if not set_dtype[k]
+                        else v
                         for k, v in batch.items()
                     }
 
-                with torch_utils.get_amp_ctxt_for_precision(precision=precision, device=device):
+                with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
                     if measure_memory:
                         memory_alloc = torch_utils.measure_memory_allocation(model, batch, device)
@@ -222,10 +233,7 @@ def benchmark_model(
                         progress_bar,
                         timing_function=torch_utils.measure_repeated_inference_timing,
                     )
-            elif model_type == "onnx":
-                if utils.AMP_PREFIX in precision.value:
-                    raise ValueError(f"ONNX models do not support AMP precision {precision}")
-
+            elif isinstance(model_cfg, OnnxModelConfig):
                 from nvbenjo import onnx_utils
 
                 batch = onnx_utils.get_rnd_input_batch(model.get_inputs(), model_cfg.shape, batch_size)
@@ -233,15 +241,6 @@ def benchmark_model(
                 memory_alloc = 0
                 num_model_parameters = 0
                 set_dtype = False
-
-                # only apply precision to input if no precision is specified
-                if not set_dtype:
-                    batch = torch_utils.apply_batch_precision(batch, precision=precision)
-                else:
-                    batch = {
-                        k: torch_utils.apply_batch_precision(v, precision=precision) if not set_dtype[k] else v
-                        for k, v in batch.items()
-                    }
                 if measure_memory:
                     memory_alloc = onnx_utils.measure_memory_allocation(model, batch, device)
                 else:
@@ -265,14 +264,14 @@ def benchmark_model(
             cur_results["memory_bytes"] = memory_alloc
             cur_results["model"] = model_cfg.name
             cur_results["batch_size"] = batch_size
-            cur_results["precision"] = precision.value
+            cur_results["runtime_options"] = runtime_option_name
             cur_results["device"] = str(device)
             results.append(cur_results)
         except torch.cuda.OutOfMemoryError:
             console.print(
-                f"[red]Out of memory for batch size {batch_size} and precision {precision} on device {str(device)}[/red]"
+                f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {str(device)}[/red]"
             )
-            precision_batch_oom[precision] = batch_size
+            precision_batch_oom[runtime_option_name] = batch_size
             continue
         finally:
             progress_bar.advance(bench_task)

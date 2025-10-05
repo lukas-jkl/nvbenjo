@@ -23,7 +23,9 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
         if verbose and console is not None:
             console.print(f"Loading torch model {type_or_path}")
         try:
-            return torch.load(type_or_path, map_location=device, weights_only=False)
+            model = torch.load(type_or_path, map_location=device, weights_only=False)
+            model.eval()
+            return model
         except Exception:
             try:
                 return torch.jit.load(type_or_path, map_location=device)

@@ -23,7 +23,7 @@ def visualize_results(
         "time_total_batch_normalized",
         "memory_bytes",
     ],
-    hue="precision",
+    hue="runtime_options",
     col="batch_size",
     kind="bar",
 ):
@@ -104,7 +104,7 @@ def print_results(
             # Get grouped results
             device_results = model_results[model_results.device == device]
             device_results = device_results.drop(columns=["device"])
-            device_results = device_results.groupby(["model", "precision", "batch_size"]).mean()
+            device_results = device_results.groupby(["model", "runtime_options", "batch_size"]).mean()
             device_results["device"] = device  # Add device column back for display
             print_result = device_results.reset_index()
 
@@ -115,7 +115,7 @@ def print_results(
                     print_result[column] = print_result[column].apply(format_seconds)
                     for i, emoji in enumerate(["🥇", "🥈", "🥉"][: len(top3)]):
                         print_result.loc[top3[i], column] = f"{emoji} {print_result.loc[top3[i], column]}"
-                elif "time" in column:
+                elif column.startswith("time"):
                     print_result[column] = print_result[column].apply(format_seconds)
                 elif "bytes" in column:
                     print_result[column] = print_result[column].apply(format_num, bytes=True)
@@ -127,13 +127,13 @@ def print_results(
                 # Set column styles based on data type
                 if col == "model":
                     style = "bold green"
-                elif col == "precision":
+                elif col == "runtime_options":
                     style = "bold blue"
                 elif col == "batch_size":
                     style = "bold yellow"
                 elif col == "time_total_batch_normalized":
                     style = "bold cyan"
-                elif "time" in col:
+                elif col.startswith("time"):
                     style = None
                 elif "memory" in col:
                     style = "red"

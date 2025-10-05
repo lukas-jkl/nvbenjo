@@ -10,7 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from nvbenjo import plot
 from nvbenjo.benchmark import benchmark_models
-from nvbenjo.cfg import BenchConfig, check_config
+from nvbenjo.cfg import BenchConfig, instantiate_model_configs
 from nvbenjo.system_info import get_system_info
 from nvbenjo import console
 from rich.logging import RichHandler
@@ -28,16 +28,16 @@ def nvbenjo(cfg: ty.Union[BenchConfig, DictConfig]):
 
 def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
-    check_config(cfg)
+    models = instantiate_model_configs(cfg)
     if cfg.output_dir is not None:
         output_dir = os.path.abspath(cfg.output_dir)
 
     system_info = get_system_info()
 
-    logger.info(f"Starting benchmark, output-dir {output_dir}")
-    results = benchmark_models(
-        cfg.nvbenjo.models, measure_memory=cfg.nvbenjo.measure_memory, profile=cfg.nvbenjo.profile
-    )
+    if cfg.output_dir is not None:
+        logger.info(f"Starting benchmark, output-dir {output_dir}")
+
+    results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory, profile=cfg.nvbenjo.profile)
 
     if cfg.output_dir is not None:
         results.to_csv(join(output_dir, "out.csv"))
