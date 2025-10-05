@@ -10,25 +10,19 @@ A tool for evaluating system performance against pytorch models.
 ## Usage
 
 ```bash
-nvbenjo
+# Specify models to run in the command line
+nvbenjo \
+"+nvbenjo.models={\
+    efficientnet: {type_or_path: 'torchvision:efficientnet_b0',  shape:['B',3,224,224],  batch_sizes: [16,32]},\
+    resnet:       {type_or_path: 'torchvision:wide_resnet101_2', shape: ['B',3,224,224], batch_sizes: [16,32]}\
+}"
 
-# with custom output directory
-nvbenjo output_dir=testout
+# or better, specify your own config (or one of the pre-defined config files)
+nvbenjo -cn small
+nvbenjo -cd="/my/config/path" -cn="myconfig.yaml"
 
-# override single arguments
-nvbenjo output_dir=testout nvbenjo.models.0.num_batches=10
-
-# custom model configuration
-nvbenjo 'nvbenjo.models=['\
-'   {name: "efficientnet", type_or_path: "efficientnet_b0", shape: ["B", 3, 224, 224], batch_sizes: [16, 32], precisions: [FP32, FP16]},'\
-'   {name: "custommodel", type_or_path: "wide_resnet101_2", shape: ["B", 3, 224, 224], batch_sizes: [16, 32], precisions: [AMP, FP16]}'\
-']'
-
-nvbenjo 'nvbenjo.models=['\
-'   {name: "efficientnet", type_or_path: "efficientnet_b0", shape: [["B", 3, 224, 224], ["B", 3, 224, 224]], batch_sizes: [16, 32], precisions: [FP32, FP16]},'\
-']'
-# or specify your own config
-nvbenjo -cn customconfig
+# override single arguments of your config
+nvbenjo -cd="/my/config/path" -cn="myconfig.yaml" nvbenjo.models.mymodel.num_batches=10
 ```
 
 
