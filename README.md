@@ -19,7 +19,11 @@ nvbenjo \
 
 # or better, specify your own config (or one of the pre-defined config files)
 nvbenjo -cn small
-nvbenjo -cd="/my/config/path" -cn="myconfig.yaml"
+# if the config is in the same working directory
+nvbenjo -cn="myconfig.yaml"
+# Otherwise specify the directory and config file
+#TODO: this is an annoying limitation of hydra we can prob. hack this into a sinlge arg by patching main?
+nvbenjo -cd="/my/config/path" -cn="myconfig.yaml" 
 
 # override single arguments of your config
 nvbenjo -cd="/my/config/path" -cn="myconfig.yaml" nvbenjo.models.mymodel.num_batches=10
