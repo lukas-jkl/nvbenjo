@@ -37,6 +37,9 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     if cfg.output_dir is not None:
         logger.info(f"Starting benchmark, output-dir {output_dir}")
 
+    if len(models) == 0:
+        logger.info("No models to benchmark, please specify a configuration or override via the command line.")
+        return
     results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory, profile=cfg.nvbenjo.profile)
 
     if cfg.output_dir is not None:

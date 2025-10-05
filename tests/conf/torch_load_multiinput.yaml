@@ -3,19 +3,10 @@ defaults:
   - _self_ 
 
 nvbenjo:
-  measure_memory: true
-  profile: false
   models:
-  - name: dummytorchmodel
-    type_or_path: replaceme
-    kwargs: {}
-    shape: [[B, 10], [B, 20]]
-    num_warmup_batches: 1
-    num_batches: 2
-    batch_sizes:
-    - 1
-    - 2
-    devices:
-    - "cpu"
-    precisions:
-    - FP32
+    dummytorchmodel:
+      type_or_path: replaceme
+      shape: [[B, 10], [B, 20]]
+      batch_sizes: [1, 2]
+      devices: ["cpu"]
+

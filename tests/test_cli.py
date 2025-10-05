@@ -43,8 +43,7 @@ def _check_files(directory, files):
 
 def _check_run_files(cfg):
     expected_files = copy(EXPECTED_OUTPUT_FILES)
-    for model_cfg in cfg.nvbenjo.models:
-        model_name = model_cfg.name
+    for model_name in cfg.nvbenjo.models.keys():
         expected_files.append(join(model_name, "time_inference.png"))
         expected_files.append(join(model_name, "time_total_batch_normalized.png"))
         expected_files.append(join(model_name, "time_device_to_cpu.png"))
@@ -59,12 +58,11 @@ def _check_run_files(cfg):
     _check_files(cfg.output_dir, expected_files)
 
 
-def test_basic():
+def test_default():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg = compose(config_name="default", overrides=[f"output_dir={tmpdir}"])
             run_config(cfg)
-            _check_run_files(cfg)
 
 
 def test_small_single():
@@ -73,14 +71,6 @@ def test_small_single():
             cfg = compose(config_name="small_single", overrides=[f"output_dir={tmpdir}"])
             run_config(cfg)
             _check_run_files(cfg)
-
-
-def test_duplicate_model_names():
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cfg = compose(config_name="duplicate_model_name", overrides=[f"output_dir={tmpdir}"])
-            with pytest.raises(ValueError):
-                run_config(cfg)
 
 
 def test_min_max_input_type():
@@ -109,7 +99,10 @@ def test_torch_load():
             with tempfile.TemporaryDirectory() as tmpoutdir:
                 cfg = compose(
                     config_name="torch_load",
-                    overrides=[f"output_dir={tmpoutdir}", f'nvbenjo.models.0.type_or_path="{tmpfile.name}"'],
+                    overrides=[
+                        f"output_dir={tmpoutdir}",
+                        f'nvbenjo.models.dummytorchmodel.type_or_path="{tmpfile.name}"',
+                    ],
                 )
                 run_config(cfg)
                 _check_run_files(cfg)
@@ -136,7 +129,7 @@ def test_torch_load_multiinput():
                     config_name="torch_load_multiinput",
                     overrides=[
                         f"output_dir={tmpoutdir}",
-                        f'nvbenjo.models.0.type_or_path="{tmpfile.name}"',
+                        f'nvbenjo.models.dummytorchmodel.type_or_path="{tmpfile.name}"',
                     ],
                 )
                 run_config(cfg)
@@ -159,7 +152,7 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
 
 @pytest.mark.parametrize("export_type", ["torchexport", "torchsave", "torchscript"])
 def test_torch_load_complex_multiinput(export_type):
-    if export_type == "torchexport":
+    if export_type == "torchexport" and torch.__version__ < "2.1":
         pytest.skip("torch.export is only available in PyTorch 2.1 and later")
 
     min = 12
@@ -189,29 +182,32 @@ def test_torch_load_complex_multiinput(export_type):
             with tempfile.TemporaryDirectory() as tmpoutdir:
                 config_override = {
                     "nvbenjo": {
-                        "models": [
-                            {
-                                "name": "dummytorchmodel",
+                        "models": {
+                            "dummytorchmodel": {
                                 "type_or_path": tmpfile.name,
                                 "num_batches": 2,
                                 "batch_sizes": [1, 2],
                                 "devices": ["cpu"],
-                                "precisions": ["FP32", "FP16", "AMP_FP16"],
+                                "runtime_options": {
+                                    "FP32": {"precision": "FP32", "compile": False},
+                                    "FP16": {"precision": "FP16", "compile": False},
+                                    "AMP_FP16": {"precision": "AMP_FP16", "compile": False},
+                                },
                                 "shape": [
                                     {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
                                     {"name": "y", "shape": ["B", 20], "min_max": [min, max]},
                                 ],
                             }
-                        ]
+                        }
                     }
                 }
                 if torch.__version__ < "2.2":
-                    config_override["nvbenjo"]["models"][0]["precisions"].remove("AMP_FP16")
-                    config_override["nvbenjo"]["models"][0]["precisions"].remove("FP16")
+                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("AMP_FP16", None)
+                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("FP16", None)
 
                 if export_type == "torchexport":
                     # torchexport does not work with named inputs
-                    config_override["nvbenjo"]["models"][0]["shape"] = [
+                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["shape"] = [
                         ["B", 10],
                         ["B", 20],
                     ]
@@ -221,7 +217,11 @@ def test_torch_load_complex_multiinput(export_type):
                         f"output_dir={tmpoutdir}",
                     ],
                 )
+
+                # temporary disable struct mode to allow merging additional model
+                omegaconf.OmegaConf.set_struct(cfg, False)
                 cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                omegaconf.OmegaConf.set_struct(cfg, True)
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", category=UserWarning)
                     run_config(cfg)
@@ -239,20 +239,21 @@ def test_torch_load_complex_invalid_multiinput():
             with tempfile.TemporaryDirectory() as tmpoutdir:
                 config_override = {
                     "nvbenjo": {
-                        "models": [
-                            {
-                                "name": "dummytorchmodel",
+                        "models": {
+                            "dummytorchmodel": {
                                 "type_or_path": tmpfile.name,
                                 "num_batches": 2,
                                 "batch_sizes": [1, 2],
                                 "devices": ["cpu"],
-                                "precisions": ["FP32"],
+                                "runtime_options": {
+                                    "FP32": {"precision": "FP32", "compile": False},
+                                },
                                 "shape": [
                                     {"name": "x", "shape": ["B", 10], "type": "float", "min_max": [max, max * 2]},
                                     {"name": "y", "shape": ["B", 20], "type": "float", "min_max": [max, max * 2]},
                                 ],
                             }
-                        ]
+                        }
                     }
                 }
                 cfg = compose(
@@ -261,7 +262,10 @@ def test_torch_load_complex_invalid_multiinput():
                         f"output_dir={tmpoutdir}",
                     ],
                 )
+                # temporary disable struct mode to allow merging additional model
+                omegaconf.OmegaConf.set_struct(cfg, False)
                 cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                omegaconf.OmegaConf.set_struct(cfg, True)
                 if isinstance(cfg, omegaconf.DictConfig):
                     with pytest.raises(
                         ValueError, match=f"Input x contains values outside the range \\[{min}, {max}\\]"

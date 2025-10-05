@@ -6,15 +6,14 @@ nvbenjo:
   measure_memory: true
   profile: false
   models:
-  - name: dummytorchmodel
-    type_or_path: replaceme
-    kwargs: {}
-    shape: [{"name": "x", "shape": ["B", 10], "dtype": "float", min_max: [0, 0.5]}]
-    num_warmup_batches: 1
-    num_batches: 2
-    batch_sizes:
-    - 1
-    devices:
-    - "cpu"
-    precisions:
-    - FP32
+    dummytorchmodel:
+      type_or_path: replaceme
+      kwargs: {}
+      shape: [{"name": "x", "shape": ["B", 10], "dtype": "float", min_max: [0, 0.5]}]
+      num_warmup_batches: 1
+      num_batches: 2
+      batch_sizes: [1]
+      devices: ["cpu"]
+      runtime_options:
+        FP32:
+          precision: FP32

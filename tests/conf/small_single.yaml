@@ -1,4 +1,3 @@
-# only run a single model with a single setting
 defaults:
   - base_config
   - _self_ 
@@ -7,19 +6,16 @@ nvbenjo:
   measure_memory: false
   profile: false
   models:
-  - name: shufflenet
-    type_or_path: torchvision:shufflenet_v2_x0_5
-    kwargs: {}
-    shape:
-    - B
-    - 3
-    - 224
-    - 224
-    num_warmup_batches: 1
-    num_batches: 1
-    batch_sizes:
-    - 1
-    devices:
-    - "cpu"
-    precisions:
-    - FP32
+    shufflenet:
+      type_or_path: torchvision:shufflenet_v2_x0_5
+      kwargs: {}
+      shape: [B, 3, 224, 224]
+      num_warmup_batches: 1
+      num_batches: 1
+      batch_sizes:
+      - 1
+      devices:
+      - "cpu"
+      runtime_options:
+        FP32:
+          precision: FP32
