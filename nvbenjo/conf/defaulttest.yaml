@@ -1,0 +1,31 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  measure_memory: false
+  profile: false
+  models:
+    shufflenet:
+      #_target_: nvbenjo.cfg.TorchModelConfig
+      type_or_path: torchvision:shufflenet_v2_x0_5
+      kwargs: {}
+      shape: [B, 3, 224, 224]
+      num_warmup_batches: 1
+      num_batches: 2
+      batch_sizes: [1, 2]
+      devices: ["cuda:0"]
+      runtime_options:
+        defaultfp32:
+          compile: false
+          precision: FP32
+    resnet:
+      #_target_: nvbenjo.cfg.OnnxModelConfig
+      # wget https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/resnet/model/resnet50-v2-7.onnx?download= ~/Downloads/resnet50-v2-7.onnx
+      type_or_path: ~/Downloads/resnet50-v2-7.onnx
+      shape: [{"name": "data", "shape": [B, 3, 224, 224], "type": "float", "min_max": [0, 1]}]
+      num_warmup_batches: 3
+      num_batches: 2
+      batch_sizes: [1, 8, 16, 32]
+      devices: ["cuda:0"]
+

@@ -4,37 +4,55 @@ defaults:
 
 nvbenjo:
   models:
-      - name: bert
+      bert:
         type_or_path: huggingface:google-bert/bert-base-cased
         kwargs: {}
         shape: [{"name": "input_ids", "shape": [B, 200], "type": "long", min_max: [0, 200]}]
-        num_warmup_batches: 1
-        num_batches: 10
-        batch_sizes: [8, 16, 32]
-        devices: ["cuda:0"]
-        precisions: [FP16, FP32, AMP_FP16]
+        num_warmup_batches: &num-warmup-batches 1
+        num_batches: &num-batches 10
+        batch_sizes: &batch-sizes [1, 8, 16]
+        devices: &devices ["cuda:0"]
+        runtime_options:
+          FP16:
+            precision: FP16
+          FP32:
+            precision: FP32
+          AMP_FP16:
+            precision: AMP_FP16
 
-      - name: gpt2
+      gpt2:
         type_or_path: huggingface:openai-community/gpt2
         kwargs: {}
         shape: [{"name": "input_ids", "shape": [B, 90], "type": "long", min_max: [0, 200]}]
-        num_warmup_batches: 5
-        num_batches: 20
-        batch_sizes: [16, 32]
-        devices: ["cuda:0"]
-        precisions: [BFLOAT16, FP32]
+        num_warmup_batches: *num-warmup-batches
+        num_batches: *num-batches
+        batch_sizes: *batch-sizes
+        devices: *devices
+        runtime_options:
+          BFLOAT16:
+            compile: false
+            precision: BFLOAT16
+          FP32:
+            compile: false
+            precision: FP32
 
-      - name: ast-audioset
+      ast-audioset:
         type_or_path: huggingface:MIT/ast-finetuned-audioset-10-10-0.4593
         kwargs: {}
         shape: [{"name": "input_values", "shape": [B, 1024, 128], "type": "float", "min_max": [0, 1]}]
-        num_warmup_batches: 5
-        num_batches: 10
-        batch_sizes: [1, 8]
-        devices: ["cuda:0"]
-        precisions: [FP32, AMP_FP16]
+        num_warmup_batches: *num-warmup-batches
+        num_batches: *num-batches
+        batch_sizes: *batch-sizes
+        devices: *devices
+        runtime_options:
+          FP32:
+            precision: FP32
+          AMP_FP16:
+            precision: AMP_FP16
+          AMP_BFLOAT16:
+            precision: AMP_BFLOAT16
 
-      - name: openai/whisper-small
+      openai/whisper-small:
         type_or_path: huggingface:openai/whisper-small
         kwargs: {}
         shape: [
@@ -42,13 +60,17 @@ nvbenjo:
             {"name": "decoder_input_ids", "shape": [B, 6], "value": 50258, "type": "long"},
             {"name": "attention_mask", "shape": [B, 6], "value": 1, "type": "long"},
           ]
-        num_warmup_batches: 5
-        num_batches: 10
-        batch_sizes: [1, 4, 8]
-        devices: ["cuda:0"]
-        precisions: [FP16]
+        num_warmup_batches: *num-warmup-batches
+        num_batches: *num-batches
+        batch_sizes: *batch-sizes
+        devices: *devices
+        runtime_options:
+          FP16:
+            precision: FP16
+          FP32:
+            precision: FP32
 
-      - name: google/t5
+      google/t5:
         type_or_path: huggingface:google/t5-v1_1-small
         kwargs: {}
         shape: [
@@ -56,23 +78,33 @@ nvbenjo:
             {"name": "attention_mask", "shape": [B, 512], "type": "long", "value": 1},
             {"name": "decoder_input_ids", "shape": [B, 8], "type": "long", "value": 0},
           ]
-        num_warmup_batches: 5
-        num_batches: 10
-        batch_sizes: [1, 8, 16]
-        devices: ["cuda:0"]
-        precisions: [FP16, FP32]
+        num_warmup_batches: *num-warmup-batches
+        num_batches: *num-batches
+        batch_sizes: *batch-sizes
+        devices: *devices
+        runtime_options:
+          FP16:
+            precision: FP16
+          FP32:
+            precision: FP32
 
-      - name: mobilevit
+      mobilevit:
         type_or_path: huggingface:apple/mobilevit-small
         kwargs: {}
         shape: [{"name": "pixel_values", "shape": [B, 3, 224, 224], "type": "float", "min_max": [0, 1]}]
-        num_warmup_batches: 5
-        num_batches: 10
-        batch_sizes: [1, 8, 16]
-        devices: ["cuda:0"]
-        precisions: [FP32, AMP_FP16, AMP_BFLOAT16]
+        num_warmup_batches: *num-warmup-batches
+        num_batches: *num-batches
+        batch_sizes: *batch-sizes
+        devices: *devices
+        runtime_options:
+          FP32:
+            precision: FP32
+          AMP_FP16:
+            precision: AMP_FP16
+          AMP_BFLOAT16:
+            precision: AMP_BFLOAT16
 
-      # - name: llama
+      # llama:
       #   type_or_path: huggingface:openlm-research/open_llama_7b
       #   kwargs: {}
       #   shape: [{"name": "input_ids", "shape": [B, 90], "type": "long", min_max: [0, 200]}]
@@ -80,4 +112,10 @@ nvbenjo:
       #   num_batches: 20
       #   batch_sizes: [1, 2]
       #   devices: ["cuda:0"]
-      #   precisions: [BFLOAT16, FP32]
+      #   runtime_options:
+      #     BFLOAT16:
+      #       compile: false
+      #       precision: BFLOAT16
+      #     FP32:
+      #       compile: false
+      #       precision: FP32

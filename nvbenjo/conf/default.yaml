@@ -1,6 +1,7 @@
 defaults:
   - base_config
   - _self_
+  - hydra/help/nvbenjo_app_help
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 

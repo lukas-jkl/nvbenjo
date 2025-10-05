@@ -4,13 +4,9 @@ defaults:
 
 nvbenjo:
   models:
-      - name: silero
+      silero:
         # wget https://models.silero.ai/models/tts/en/v3_en_silero_tts_fp16.onnx -O ~/Downloads/silero_model_fp16.onnx
         type_or_path: ~/Downloads/silero_model_fp16.onnx
-        kwargs: {
-          providers: ["CUDAExecutionProvider", "CPUExecutionProvider"],
-          session_options: {}
-        }
         shape:
           - {name: "input", shape: [B, 512], "type": "float", min_max: [0, 1]}
           - {name: "sr", shape: [], type: "int64", value: 16000}
@@ -19,4 +15,3 @@ nvbenjo:
         num_batches: 20
         batch_sizes: [1, 8, 16, 128]
         devices: ["cuda:0", "cpu"]
-        precisions: [FP32]
