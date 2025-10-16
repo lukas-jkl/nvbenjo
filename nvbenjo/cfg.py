@@ -17,11 +17,14 @@ class TorchRuntimeConfig:
 
 @dataclass
 class OnnxRuntimeConfig:
-    execution_providers: ty.Tuple[str, ...] = ("CPUExecutionProvider",)
-    graph_optimization_level: int = 99  # ORT_ENABLE_ALL
-    intra_op_num_threads: ty.Optional[int] = None
-    inter_op_num_threads: ty.Optional[int] = None
+    execution_providers: ty.Optional[ty.Tuple[str, ...]] = None
+    graph_optimization_level: str = (
+        "ORT_ENABLE_ALL"  # 99 ORT_ENABLE_ALL, 3 ORT_ENABLE_LAYOUT, 1 ORT_ENABLE_BASIC, 0 ORT_DISABLE_ALL
+    )
+    intra_op_num_threads: int = 1
+    inter_op_num_threads: int = 0
     log_severity_level: int = 2  # Warning
+    provider_options: ty.Sequence[dict[ty.Any, ty.Any]] | None = None
 
 
 @dataclass
@@ -73,14 +76,45 @@ class BenchConfig:
 
 def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> ty.Dict[str, BaseModelConfig]:
     models = {}
+    runtimes = {}
     for model_name, model in cfg.nvbenjo.models.items():
         ctxt = open_dict(model) if isinstance(model, DictConfig) else nullcontext()
         if "_target_" not in model:
             with ctxt:
                 if model["type_or_path"].endswith(".onnx"):
-                    cfg.nvbenjo.models[model_name]["_target_"] = "nvbenjo.cfg.OnnxModelConfig"
+                    cfg.nvbenjo.models[model_name]["_target_"] = (
+                        f"{OnnxModelConfig.__module__}.{OnnxModelConfig.__qualname__}"
+                    )
+                    cfg.nvbenjo.models[model_name]["_convert_"] = "all"
+                    if "runtime_options" in model:
+                        runtimes[model_name] = {}
+                        for runtime_name in model["runtime_options"].keys():
+                            cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["_target_"] = (
+                                f"{OnnxRuntimeConfig.__module__}.{OnnxRuntimeConfig.__qualname__}"
+                            )
+                            runtimes[model_name][runtime_name] = instantiate(
+                                cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]
+                            )
                 else:
-                    cfg.nvbenjo.models[model_name]["_target_"] = "nvbenjo.cfg.TorchModelConfig"
+                    cfg.nvbenjo.models[model_name]["_target_"] = (
+                        f"{TorchModelConfig.__module__}.{TorchModelConfig.__qualname__}"
+                    )
+                    cfg.nvbenjo.models[model_name]["_convert_"] = "all"
+                    if "runtime_options" in model:
+                        runtimes[model_name] = {}
+                        for runtime_name in model["runtime_options"].keys():
+                            cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["_target_"] = (
+                                f"{TorchRuntimeConfig.__module__}.{TorchRuntimeConfig.__qualname__}"
+                            )
+                            runtimes[model_name][runtime_name] = instantiate(
+                                cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]
+                            )
+                            runtimes[model_name][runtime_name].precision = PrecisionType[
+                                cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["precision"]
+                            ]
+
         models[model_name] = instantiate(model) if isinstance(model, DictConfig) else model
+        if model_name in runtimes:
+            models[model_name].runtime_options = runtimes[model_name]
 
     return models

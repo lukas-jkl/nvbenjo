@@ -4,6 +4,8 @@ import nvitop
 import threading
 import typing as ty
 
+from nvbenjo.cfg import OnnxRuntimeConfig
+
 try:
     import onnxruntime as ort  # type: ignore
 except ImportError:
@@ -21,7 +23,9 @@ from nvbenjo.utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_d
 
 
 # TODO: remove verbose
-def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ort.InferenceSession:
+def get_model(
+    type_or_path: str, device: torch.device, runtime_config: OnnxRuntimeConfig, verbose=False, **kwargs
+) -> ort.InferenceSession:
     type_or_path = os.path.expanduser(type_or_path)
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
@@ -29,7 +33,7 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
     if verbose and console is not None:
         console.print(f"Loading ONNX model {type_or_path}")
 
-    if "providers" not in kwargs:
+    if runtime_config.execution_providers is None:
         if device.type == "cuda":
             if "CUDAExecutionProvider" not in ort.get_available_providers():  # type: ignore
                 raise RuntimeError(
@@ -40,15 +44,23 @@ def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) 
         else:
             providers = ["CPUExecutionProvider"]
     else:
-        providers = kwargs.pop("providers")
+        providers = runtime_config.execution_providers
 
     session_options = ort.SessionOptions()  # type: ignore
-    session_options.log_severity_level = 3
-    # session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    provider_options = kwargs.get("provider_options", None)
+    session_options.log_severity_level = runtime_config.log_severity_level
+    session_options.intra_op_num_threads = runtime_config.intra_op_num_threads
+    session_options.inter_op_num_threads = runtime_config.inter_op_num_threads
+    session_options.graph_optimization_level = getattr(
+        ort.GraphOptimizationLevel,
+        runtime_config.graph_optimization_level,  # type: ignore
+    )
 
     sess = ort.InferenceSession(
-        type_or_path, sess_options=session_options, providers=providers, provider_options=provider_options, **kwargs
+        type_or_path,
+        sess_options=session_options,
+        providers=providers,
+        provider_options=runtime_config.provider_options,
+        **kwargs,
     )
     return sess
 

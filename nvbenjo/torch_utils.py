@@ -12,12 +12,15 @@ import torch.nn as nn
 import torchvision
 
 from nvbenjo import console
+from nvbenjo.cfg import TorchRuntimeConfig
 from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike
 
 logger = logging.getLogger(__name__)
 
 
-def get_model(type_or_path: str, device: torch.device, verbose=False, **kwargs) -> ty.Any:
+def get_model(
+    type_or_path: str, device: torch.device, runtime_config: TorchRuntimeConfig, verbose=False, **kwargs
+) -> ty.Any:
     type_or_path = os.path.expanduser(type_or_path)
     if os.path.isfile(type_or_path):
         if verbose and console is not None:

@@ -11,6 +11,7 @@ except ImportError as e:
         pytest.skip("onnxruntime is not installed, skipping ONNX utils tests.", allow_module_level=True)
     else:
         raise
+from nvbenjo.cfg import OnnxRuntimeConfig
 
 
 @dataclass
@@ -24,7 +25,9 @@ def test_get_model():
     with pytest.raises(
         ValueError, match="Invalid model tests/data/doesnotexist.onnx. Must be a valid ONNX path ending with .onnx"
     ):
-        _ = onnx_utils.get_model("tests/data/doesnotexist.onnx", device=torch.device("cpu"), verbose=True)
+        _ = onnx_utils.get_model(
+            "tests/data/doesnotexist.onnx", device=torch.device("cpu"), runtime_config=OnnxRuntimeConfig()
+        )
 
 
 @pytest.mark.parametrize(

@@ -11,18 +11,23 @@ from rich.progress import Progress
 
 import nvbenjo.utils as utils
 from nvbenjo import console, torch_utils
-from nvbenjo.cfg import BaseModelConfig, TorchModelConfig, OnnxModelConfig
+from nvbenjo.cfg import BaseModelConfig, TorchModelConfig, OnnxModelConfig, TorchRuntimeConfig, OnnxRuntimeConfig
 
 logger = logging.getLogger(__name__)
 
 
-def load_model(type_or_path: str, device: torch.device, **kwargs) -> tuple[Any, str]:
-    if type_or_path.endswith(".onnx"):
-        from nvbenjo import onnx_utils
+def load_model(
+    type_or_path: str, device: torch.device, runtime_config: TorchRuntimeConfig | OnnxRuntimeConfig, **kwargs
+) -> Any:
+    match runtime_config:
+        case OnnxRuntimeConfig():
+            from nvbenjo import onnx_utils
 
-        return onnx_utils.get_model(type_or_path, device=device, **kwargs), "onnx"
-    else:
-        return torch_utils.get_model(type_or_path, device=device, **kwargs), "torch"
+            return onnx_utils.get_model(type_or_path, device=device, runtime_config=runtime_config, **kwargs)
+        case TorchRuntimeConfig():
+            return torch_utils.get_model(type_or_path, device=device, runtime_config=runtime_config, **kwargs)
+        case _:
+            raise ValueError(f"Unknown runtime config type {type(runtime_config)}")
 
 
 def _test_load_models(model_cfgs: Dict[str, BaseModelConfig]) -> None:
@@ -30,7 +35,13 @@ def _test_load_models(model_cfgs: Dict[str, BaseModelConfig]) -> None:
     logger.info("Checking if models are valid and available")
     for _, model_cfg in model_cfgs.items():
         if model_cfg.type_or_path not in loaded_types:
-            _, _ = load_model(model_cfg.type_or_path, device=torch.device("cpu"), verbose=True, **model_cfg.kwargs)
+            initial_runtime_options = list(model_cfg.runtime_options.values())[0]
+            _ = load_model(
+                model_cfg.type_or_path,
+                device=torch.device("cpu"),
+                runtime_config=initial_runtime_options,
+                **model_cfg.kwargs,
+            )
             loaded_types.append(model_cfg.type_or_path)
 
 
@@ -101,7 +112,7 @@ def _measure_timings(
     num_batches: int,
     progress_bar: Optional[Progress],
     timing_function: Callable = torch_utils.measure_repeated_inference_timing,
-):
+) -> pd.DataFrame:
     if progress_bar is not None:
         measure_task = progress_bar.add_task(
             "    Inference",
@@ -129,33 +140,42 @@ def _measure_timings(
     return cur_raw_results
 
 
-def _get_device(model_type: str, device: str, console) -> torch.device:
+def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: str, console) -> torch.device:
     device_chosen = torch.device(device)
-    if device_chosen.type == "cpu":
-        return device_chosen
-    elif device_chosen.type == "cuda":
-        if model_type == "torch":
-            if torch.cuda.is_available():
-                return device_chosen
-            else:
-                console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
-                return torch.device("cpu")
-        if model_type == "onnx":
-            from nvbenjo import onnx_utils
+    match device_chosen.type:
+        case "cpu":
+            return device_chosen
+        case "cuda":
+            match runtime_config:
+                case TorchRuntimeConfig():
+                    if torch.cuda.is_available():
+                        return device_chosen
+                    else:
+                        console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
+                        return torch.device("cpu")
 
-            available_providers = onnx_utils.ort.get_available_providers()  # type: ignore
-            if torch.cuda.is_available() and "CUDAExecutionProvider" in available_providers:
-                return device_chosen
-            else:
-                if torch.cuda.is_available():
-                    console.print(
-                        "[yellow]CUDAExecutionProvider is not available in onnxruntime. Running on CPU.[/yellow]"
-                    )
-                else:
-                    console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
-                return torch.device("cpu")
-    else:
-        raise ValueError(f"Invalid device {device}. Must be one of cpu or cuda")
+                case OnnxRuntimeConfig():
+                    from nvbenjo import onnx_utils
+
+                    available_providers = onnx_utils.ort.get_available_providers()  # type: ignore
+                    if torch.cuda.is_available() and (
+                        "CUDAExecutionProvider" in available_providers
+                        or "TensorrtExecutionProvider" in available_providers
+                    ):
+                        return device_chosen
+                    else:
+                        if torch.cuda.is_available():
+                            console.print(
+                                "[yellow]CUDAExecutionProvider is not available in onnxruntime. Running on CPU.[/yellow]"
+                            )
+                        else:
+                            console.print("[yellow]CUDA is not available. Running on CPU.[/yellow]")
+                        return torch.device("cpu")
+                case _:
+                    raise ValueError(f"Unknown runtime config type {type(runtime_config)}")
+        case _:
+            raise ValueError(f"Invalid device {device}. Must be one of cpu or cuda")
+
     return device_chosen
 
 
@@ -176,22 +196,21 @@ def benchmark_model(
     if progress_bar is None:
         progress_bar = _get_progress_bar()
     console = progress_bar.console
-    _, model_type = load_model(model_cfg.type_or_path, device=torch.device("cpu"), **model_cfg.kwargs)
 
     iter_cfgs = list(itertools.product(*[model_cfg.devices, model_cfg.batch_sizes, model_cfg.runtime_options.items()]))
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
     for device, batch_size, (runtime_option_name, runtime_cfg) in iter_cfgs:
         if precision_batch_oom.get(runtime_option_name, np.inf) < batch_size:
-            # already went oom for this precision with smaller batch size -> skip bigger one
+            # already went oom for these runtime options with smaller batch size -> skip bigger one
             progress_bar.advance(bench_task)
             continue
         try:
-            device = _get_device(model_type, device, console)
+            device = _get_device(runtime_cfg, device, console)
             progress_bar.update(
                 bench_task, description=f"  Device {device} | batch-size: {batch_size} | {runtime_option_name}"
             )
 
-            model, model_type = load_model(model_cfg.type_or_path, device=device, **model_cfg.kwargs)
+            model = load_model(model_cfg.type_or_path, device=device, runtime_config=runtime_cfg, **model_cfg.kwargs)
             if isinstance(model_cfg, TorchModelConfig):
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 
@@ -225,12 +244,12 @@ def benchmark_model(
                     else:
                         memory_alloc = 0
                     cur_results = _measure_timings(
-                        model,
-                        batch,
-                        batch_size,
-                        device,
-                        model_cfg.num_batches,
-                        progress_bar,
+                        model=model,
+                        batch=batch,
+                        batch_size=batch_size,
+                        device=device,
+                        num_batches=model_cfg.num_batches,
+                        progress_bar=progress_bar,
                         timing_function=torch_utils.measure_repeated_inference_timing,
                     )
             elif isinstance(model_cfg, OnnxModelConfig):
@@ -255,7 +274,7 @@ def benchmark_model(
                     timing_function=onnx_utils.measure_repeated_inference_timing,
                 )
             else:
-                raise ValueError(f"Unknown model type {model_type}")
+                raise ValueError(f"Unknown model config type {type(model_cfg)}")
 
             del model
             del batch
