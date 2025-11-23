@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing as ty
 from enum import Enum
 from omegaconf.listconfig import ListConfig
@@ -10,10 +12,12 @@ TRANSFER_WARNING = (
     "[yellow]Warning: Could not transfer model output to CPU. Time to CPU measures will be incorrect.[/yellow]"
 )
 
-Shape = ty.Union[ty.Tuple[ty.Union[int, str], ...], ty.Dict[str, ty.Any]]
-TensorLike = ty.Union[torch.Tensor, ty.Tuple[torch.Tensor, ...], ty.Dict[str, torch.Tensor]]
+SingleShape = tuple[int | str, ...] | dict[str, ty.Any]
+MultiShape = tuple[SingleShape, ...]
+Shape = SingleShape | MultiShape
+TensorLike = torch.Tensor | tuple[torch.Tensor, ...] | dict[str, torch.Tensor]
 
-EXAMPLE_VALID_SHAPES: ty.List[Shape] = [
+EXAMPLE_VALID_SHAPES: list[Shape] = [
     ("B", 3, 224, 224),
     (("B", 3, 224, 224), ("B", 10)),
     ({"name": "input1", "type": "float", "shape": ("B", 3, 224, 224), "min_max": (0, 1)},),
@@ -66,7 +70,7 @@ def format_seconds(time_seconds: float) -> str:
 
 
 def _get_rnd(
-    shape_tuple: ty.Tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int, value: ty.Optional[ty.Any] = None
+    shape_tuple: tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int, value: ty.Optional[ty.Any] = None
 ) -> torch.Tensor:
     if dtype is None or any(s in dtype for s in ["float", "double"]):
         dtype = dtype if dtype is not None else "float32"
@@ -90,7 +94,7 @@ def _get_rnd(
     return rnd
 
 
-def _check_shape_dict(si: dict) -> None:
+def _check_shape_dict(si: dict | DictConfig) -> None:
     if "name" not in si:
         raise ValueError(f"The shape definition {si} must contain a 'name' key.")
     if "dtype" in si:
@@ -106,7 +110,7 @@ def _check_shape_dict(si: dict) -> None:
 
 def get_rnd_from_shape_s(
     shape: Shape, batch_size: int, dtype=None, min_val=0, max_val=1
-) -> ty.Tuple[TensorLike, ty.Dict[str, bool]]:
+) -> tuple[TensorLike, dict[str, bool]]:
     try:
         depends_on_batch = False
         set_individual_types = {}
@@ -128,6 +132,9 @@ def get_rnd_from_shape_s(
         elif all(isinstance(si, (dict, DictConfig)) for si in shape):
             rnd_input = {}
             for si in shape:
+                if not isinstance(si, (dict, DictConfig)):
+                    raise ValueError(f"Shape item {si} must be of type dict.")
+
                 # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
                 _check_shape_dict(si)
                 name = si["name"]

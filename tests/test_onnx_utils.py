@@ -18,7 +18,7 @@ from nvbenjo.cfg import OnnxRuntimeConfig
 class FakeOnnxInput:
     name: str
     type: str
-    shape: ty.List[ty.Union[int, str]]
+    shape: list[ty.Union[int, str]]
 
 
 def test_get_model():

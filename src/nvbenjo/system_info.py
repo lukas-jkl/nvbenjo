@@ -1,6 +1,7 @@
-import typing as ty
+from __future__ import annotations
+
 from platform import uname
-from typing import Any, Dict
+from typing import Any
 import logging
 
 import pynvml
@@ -27,7 +28,7 @@ def _get_architecture_name_from_version(version: int) -> str:
     return f"Version {version} ({version_names.get(version, 'Unknown')})"
 
 
-def get_gpu_info() -> ty.List[ty.Dict[str, Any]]:
+def get_gpu_info() -> list[dict[str, Any]]:
     pynvml.nvmlInit()
     device_count = pynvml.nvmlDeviceGetCount()
     infos = []
@@ -62,7 +63,7 @@ def get_gpu_power_usage(device_index: int) -> float:
     return usage
 
 
-def get_system_info() -> Dict[str, Any]:
+def get_system_info() -> dict[str, Any]:
     sys = uname()
     cpu = get_cpu_info()
     svmem = psutil.virtual_memory()

@@ -50,6 +50,11 @@ where = ["src"]
 [tool.setuptools.package-data]
 nvbenjo = ["conf/*.yml", "conf/*.yaml"]
 
+[tool.ty.src]
+include = [
+    "src",
+]
+
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint.pydocstyle]
