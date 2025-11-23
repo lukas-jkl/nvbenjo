@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
         with: 
-          src: "./nvbenjo"
+          src: "./src/nvbenjo"
 
   ruff-format:
     runs-on: ubuntu-latest
@@ -16,7 +16,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: "format --check"
-          src: "./nvbenjo"
+          src: "./src/nvbenjo"
 
   ty-check:
     runs-on: ubuntu-latest
@@ -27,7 +27,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Install the project
-        run: uv sync --extra dev --extra onnx-cpu
+        run: uv sync --extra onnx-cpu
 
       - name: Run ty
         run: uv run ty check .
