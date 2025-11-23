@@ -40,4 +40,7 @@ uv run main.py
 
 # for a quick run on CPU
 uv run main.py -cn small
+
+# tests
+uv run pytest
 ```
