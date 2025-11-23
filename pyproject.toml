@@ -29,8 +29,10 @@ dev = [
     "ipython",
     "pytest",
     "ty",
-    "nox"
+    "nox",
+    "onnxscript",
 ]
+[project.optional-dependencies]
 onnx-cpu = [
     "onnx>=1.14.0",
     "onnxruntime>=1.15.0",
