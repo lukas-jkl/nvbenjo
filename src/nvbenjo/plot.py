@@ -9,8 +9,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from nvbenjo import console
-from nvbenjo.utils import format_num, format_seconds
+from . import console
+from .utils import format_num, format_seconds
 
 
 def visualize_results(

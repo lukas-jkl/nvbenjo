@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from abc import ABC
 
 from omegaconf import DictConfig, OmegaConf, open_dict
-from nvbenjo.utils import PrecisionType
+from .utils import PrecisionType
 from hydra.utils import instantiate
 from contextlib import nullcontext
 

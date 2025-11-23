@@ -4,7 +4,7 @@ import nvitop
 import threading
 import typing as ty
 
-from nvbenjo.cfg import OnnxRuntimeConfig
+from .cfg import OnnxRuntimeConfig
 
 try:
     import onnxruntime as ort  # type: ignore
@@ -17,9 +17,9 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig, ListConfig
 
-from nvbenjo import console
-from nvbenjo.torch_utils import transfer_to_device
-from nvbenjo.utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, get_rnd_from_shape_s, Shape
+from . import console
+from .torch_utils import transfer_to_device
+from .utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, get_rnd_from_shape_s, Shape
 
 
 # TODO: remove verbose

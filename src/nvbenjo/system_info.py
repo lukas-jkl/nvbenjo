@@ -7,7 +7,7 @@ import pynvml
 from cpuinfo import get_cpu_info
 import psutil
 
-from nvbenjo.utils import format_num
+from .utils import format_num
 
 logger = logging.getLogger(__name__)
 
