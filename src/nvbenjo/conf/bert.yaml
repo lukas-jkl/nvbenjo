@@ -12,4 +12,10 @@ nvbenjo:
         num_batches: 2
         batch_sizes: [1, 8]
         devices: ["cuda:0"]
-        precisions: [FP16, FP32, AMP_FP16]
+        runtime_options:
+          FP32:
+            precision: FP32
+          AMP_FP16:
+            precision: AMP_FP16
+          AMP_BFLOAT16:
+            precision: AMP_BFLOAT16
