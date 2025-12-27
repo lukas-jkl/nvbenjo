@@ -22,16 +22,12 @@ from .torch_utils import transfer_to_device
 from .utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, get_rnd_from_shape_s, Shape
 
 
-# TODO: remove verbose
 def get_model(
-    type_or_path: str, device: torch.device, runtime_config: OnnxRuntimeConfig, verbose=False, **kwargs
+    type_or_path: str, device: torch.device, runtime_config: OnnxRuntimeConfig, **kwargs
 ) -> ort.InferenceSession:
     type_or_path = os.path.expanduser(type_or_path)
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
-
-    if verbose and console is not None:
-        console.print(f"Loading ONNX model {type_or_path}")
 
     if runtime_config.execution_providers is None:
         if device.type == "cuda":
