@@ -50,8 +50,8 @@ def get_model(
     if runtime_config.enable_profiling and runtime_config.profiling_prefix is not None:
         session_options.profile_file_prefix = runtime_config.profiling_prefix
     session_options.graph_optimization_level = getattr(
-        ort.GraphOptimizationLevel,
-        runtime_config.graph_optimization_level,  # type: ignore
+        ort.GraphOptimizationLevel,  # type: ignore
+        runtime_config.graph_optimization_level,
     )
 
     sess = ort.InferenceSession(
