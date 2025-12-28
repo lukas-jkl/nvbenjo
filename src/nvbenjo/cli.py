@@ -1,18 +1,19 @@
 import logging
 import os
+import sys
+import typing as ty
 from importlib.resources import files
 from os.path import join
-import typing as ty
 
 import hydra
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
+from rich.logging import RichHandler
 
 from . import console, plot
 from .benchmark import benchmark_models
 from .cfg import BenchConfig, instantiate_model_configs
 from .system_info import get_system_info
-from rich.logging import RichHandler
 
 logger = logging.getLogger(__name__)
 
@@ -55,4 +56,17 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
 
 
 if __name__ == "__main__":
+    # NOTE: this is a workaround to allow specifying config file with full path
+    #       since hydra only allows config name and config dir
+    #       so for -cn /path/to/config.yaml we add -cd /path/to and change -cn to config.yaml
+    if "-cn" in sys.argv or "--config-name" in sys.argv and "-cd" not in sys.argv and "--config-dir" not in sys.argv:
+        arg_index = sys.argv.index("-cn") if "-cn" in sys.argv else sys.argv.index("--config-name")  # type: ignore
+        cfg_index = arg_index + 1
+        if cfg_index <= len(sys.argv) - 1:
+            config_name = sys.argv[cfg_index]
+            if os.path.dirname(config_name):
+                sys.argv.append("-cd")
+                sys.argv.append(os.path.dirname(config_name))
+                sys.argv[cfg_index] = os.path.basename(config_name)
+
     nvbenjo()

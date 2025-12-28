@@ -1,13 +1,18 @@
-from copy import copy
-import omegaconf
-import pytest
 import csv
+import os
+import shutil
+import subprocess
 import tempfile
 import warnings
-import yaml
+from copy import copy
+from os.path import isfile, join
+
+import omegaconf
+import pytest
 import torch
+import yaml
 from hydra import compose, initialize
-from os.path import join, isfile
+
 from nvbenjo.cli import run
 
 EXPECTED_OUTPUT_FILES = [
@@ -274,3 +279,30 @@ def test_torch_load_complex_invalid_multiinput():
                         run_config(cfg)
                 else:
                     raise ValueError("Config is not a DictConfig instance")
+
+
+def test_cli_cn_path_arg():
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.TemporaryDirectory() as cfg_tmpdir:
+            cfg_file = os.path.join(cfg_tmpdir, "small.yaml")
+            shutil.copy2(os.path.join("tests", "conf", "small_single.yaml"), cfg_file)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "nvbenjo.cli",
+                        "-cn",
+                        cfg_file,
+                        f"output_dir={tmpdir}",
+                    ],
+                    check=True,
+                )
+
+                cfg = compose(
+                    config_name="small_single",
+                    overrides=[
+                        f"output_dir={tmpdir}",
+                    ],
+                )
+                _check_run_files(cfg)
