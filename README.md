@@ -35,12 +35,13 @@ nvbenjo -cd="/my/config/path" -cn="myconfig.yaml" nvbenjo.models.mymodel.num_bat
 Example using uv:
 
 ```bash
-uv sync --extra dev
-uv run main.py
+uv sync --extra dev --extra onnx-cpu # or gpu
+uv run nvbenjo
 
-# for a quick run on CPU
-uv run main.py -cn small
+# for a quick run
+uv run nvbenjo -cn small
 
 # tests
 uv run pytest
+uv run nox
 ```

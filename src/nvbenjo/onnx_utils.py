@@ -4,7 +4,7 @@ import nvitop
 import threading
 import typing as ty
 
-from nvbenjo.cfg import OnnxRuntimeConfig
+from .cfg import OnnxRuntimeConfig
 
 try:
     import onnxruntime as ort  # type: ignore
@@ -17,21 +17,17 @@ import pandas as pd
 import torch
 from omegaconf import DictConfig, ListConfig
 
-from nvbenjo import console
-from nvbenjo.torch_utils import transfer_to_device
-from nvbenjo.utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, get_rnd_from_shape_s, Shape
+from . import console
+from .torch_utils import transfer_to_device
+from .utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, get_rnd_from_shape_s, Shape
 
 
-# TODO: remove verbose
 def get_model(
-    type_or_path: str, device: torch.device, runtime_config: OnnxRuntimeConfig, verbose=False, **kwargs
+    type_or_path: str, device: torch.device, runtime_config: OnnxRuntimeConfig, **kwargs
 ) -> ort.InferenceSession:
     type_or_path = os.path.expanduser(type_or_path)
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
-
-    if verbose and console is not None:
-        console.print(f"Loading ONNX model {type_or_path}")
 
     if runtime_config.execution_providers is None:
         if device.type == "cuda":
@@ -50,9 +46,12 @@ def get_model(
     session_options.log_severity_level = runtime_config.log_severity_level
     session_options.intra_op_num_threads = runtime_config.intra_op_num_threads
     session_options.inter_op_num_threads = runtime_config.inter_op_num_threads
+    session_options.enable_profiling = runtime_config.enable_profiling
+    if runtime_config.enable_profiling and runtime_config.profiling_prefix is not None:
+        session_options.profile_file_prefix = runtime_config.profiling_prefix
     session_options.graph_optimization_level = getattr(
-        ort.GraphOptimizationLevel,
-        runtime_config.graph_optimization_level,  # type: ignore
+        ort.GraphOptimizationLevel,  # type: ignore
+        runtime_config.graph_optimization_level,
     )
 
     sess = ort.InferenceSession(
@@ -66,7 +65,7 @@ def get_model(
 
 
 def _sample_gpu_memory(
-    device: torch.device, stop_event: threading.Event, max_mem: ty.List[int], sample_time_s: float = 0.010
+    device: torch.device, stop_event: threading.Event, max_mem: list[int], sample_time_s: float = 0.010
 ):
     if device.type == "cuda":
         gpu = nvitop.Device(device.index)
@@ -81,7 +80,7 @@ def _sample_gpu_memory(
 
 
 def measure_memory_allocation(
-    model: ort.InferenceSession, sample: ty.Dict[str, torch.Tensor], device: torch.device, iterations: int = 3
+    model: ort.InferenceSession, sample: dict[str, torch.Tensor], device: torch.device, iterations: int = 3
 ) -> int:
     max_mem = [-1]
     stop_event = threading.Event()
@@ -112,7 +111,7 @@ def _get_formated_input_info(onnx_inputs) -> str:
     )
 
 
-def get_rnd_input_batch(onnx_session_inputs, shape: Shape, batch_size: int) -> ty.Dict[str, torch.Tensor]:
+def get_rnd_input_batch(onnx_session_inputs, shape: Shape, batch_size: int) -> dict[str, torch.Tensor]:
     def strip_type_string(s: str) -> str:
         if s.startswith("tensor(") and s.endswith(")"):
             s = s[len("tensor(") : -1]
@@ -140,7 +139,7 @@ def get_rnd_input_batch(onnx_session_inputs, shape: Shape, batch_size: int) -> t
         )
     elif all(isinstance(si, (dict, DictConfig)) for si in shape):
         onnx_inputs_by_name = {inp.name: inp for inp in onnx_session_inputs}
-        rnd_shape = tuple(dict(si) for si in shape)  # convert from DictConfig to dict
+        rnd_shape = tuple(dict(si) for si in shape)  # convert from DictConfig to dict # type: ignore
         if len(onnx_session_inputs) != len(shape):
             raise ValueError(
                 f"The model has {len(onnx_session_inputs)} inputs, but the provided input has {len(shape)} shapes. Please provide a list of shapes or a dict of shapes."
@@ -168,12 +167,12 @@ def get_rnd_input_batch(onnx_session_inputs, shape: Shape, batch_size: int) -> t
     batch, _ = get_rnd_from_shape_s(shape=rnd_shape, batch_size=batch_size)
     if not isinstance(batch, dict):
         raise ValueError("Internal Error was unable to generate dict of inputs for ONNX model.")
-    return batch
+    return batch  # type: ignore
 
 
 def measure_repeated_inference_timing(
     model: ort.InferenceSession,
-    sample: ty.Dict[str, torch.Tensor],
+    sample: dict[str, torch.Tensor],
     batch_size: int,
     model_device: torch.device,
     transfer_to_device_fn=transfer_to_device,

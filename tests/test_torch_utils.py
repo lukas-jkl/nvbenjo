@@ -39,21 +39,21 @@ def test_apply_non_amp_model_precision():
     batch = torch.randn(10, 10)
     model = apply_non_amp_model_precision(model, PrecisionType.FP16)
     batch = apply_batch_precision(batch, PrecisionType.FP16)
-    assert model.fc.weight.dtype == torch.float16  # type: ignore
+    assert model.fc.weight.dtype == torch.float16
     assert batch.dtype == torch.float16
 
     model = SimpleModel()
     batch = torch.randn(10, 10)
     model = apply_non_amp_model_precision(model, PrecisionType.FP32)
     batch = apply_batch_precision(batch, PrecisionType.FP32)
-    assert model.fc.weight.dtype == torch.float32  # type: ignore
+    assert model.fc.weight.dtype == torch.float32
     assert batch.dtype == torch.float32
 
     model = SimpleModel()
     batch = torch.randn(10, 10)
     model = apply_non_amp_model_precision(model, PrecisionType.BFLOAT16)
     batch = apply_batch_precision(batch, PrecisionType.BFLOAT16)
-    assert model.fc.weight.dtype == torch.bfloat16  # type: ignore
+    assert model.fc.weight.dtype == torch.bfloat16
     assert batch.dtype == torch.bfloat16
 
     model = SimpleModel()
@@ -61,7 +61,7 @@ def test_apply_non_amp_model_precision():
     model = apply_non_amp_model_precision(model, PrecisionType.AMP_FP16)
     batch = apply_batch_precision(batch, PrecisionType.AMP_FP16)
     # only shall apply non-amp precisions
-    assert model.fc.weight.dtype == torch.float32  # type: ignore
+    assert model.fc.weight.dtype == torch.float32
     assert batch.dtype == torch.float32
 
 

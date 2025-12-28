@@ -1,11 +1,13 @@
+import os
 import typing as ty
-from dataclasses import dataclass, field
 from abc import ABC
-
-from omegaconf import DictConfig, OmegaConf, open_dict
-from nvbenjo.utils import PrecisionType
-from hydra.utils import instantiate
 from contextlib import nullcontext
+from dataclasses import dataclass, field
+
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf, open_dict
+
+from .utils import PrecisionType
 
 
 @dataclass
@@ -17,13 +19,15 @@ class TorchRuntimeConfig:
 
 @dataclass
 class OnnxRuntimeConfig:
-    execution_providers: ty.Optional[ty.Tuple[str, ...]] = None
+    execution_providers: ty.Optional[tuple[str, ...]] = None
     graph_optimization_level: str = (
         "ORT_ENABLE_ALL"  # 99 ORT_ENABLE_ALL, 3 ORT_ENABLE_LAYOUT, 1 ORT_ENABLE_BASIC, 0 ORT_DISABLE_ALL
     )
     intra_op_num_threads: int = 1
     inter_op_num_threads: int = 0
     log_severity_level: int = 2  # Warning
+    enable_profiling: bool = False
+    profiling_prefix: ty.Optional[str] = None
     provider_options: ty.Sequence[dict[ty.Any, ty.Any]] | None = None
 
 
@@ -35,37 +39,37 @@ class BaseModelConfig(ABC):
     shape: tuple = ("B", 3, 224, 224)
     num_warmup_batches: int = 5
     num_batches: int = 50
-    batch_sizes: ty.Tuple = (16, 32)
-    devices: ty.Tuple[str] = ("cpu",)
-    runtime_options: ty.Dict[str, ty.Any] = field(default_factory=dict)
+    batch_sizes: tuple = (16, 32)
+    devices: tuple[str] = ("cpu",)
+    runtime_options: dict[str, ty.Any] = field(default_factory=dict)
 
 
 @dataclass
 class TorchModelConfig(BaseModelConfig):
     model_kwargs: dict = field(default_factory=dict)
-    runtime_options: ty.Dict[str, TorchRuntimeConfig] = field(default_factory=lambda: {"default": TorchRuntimeConfig()})
+    runtime_options: dict[str, TorchRuntimeConfig] = field(default_factory=lambda: {"default": TorchRuntimeConfig()})
 
     def __post_init__(self):
         for i, (key, opt) in enumerate(self.runtime_options.items()):
             if isinstance(opt, DictConfig):
-                self.runtime_options[key] = OmegaConf.structured(TorchRuntimeConfig(**OmegaConf.to_container(opt)))
+                self.runtime_options[key] = OmegaConf.structured(TorchRuntimeConfig(**OmegaConf.to_container(opt)))  # type: ignore
 
 
 @dataclass
 class OnnxModelConfig(BaseModelConfig):
-    runtime_options: ty.Dict[str, OnnxRuntimeConfig] = field(default_factory=lambda: {"default": OnnxRuntimeConfig()})
+    runtime_options: dict[str, OnnxRuntimeConfig] = field(default_factory=lambda: {"default": OnnxRuntimeConfig()})
 
     def __post_init__(self):
         for i, (key, opt) in enumerate(self.runtime_options.items()):
             if isinstance(opt, DictConfig):
-                self.runtime_options[key] = OmegaConf.structured(OnnxRuntimeConfig(**OmegaConf.to_container(opt)))
+                self.runtime_options[key] = OmegaConf.structured(OnnxRuntimeConfig(**OmegaConf.to_container(opt)))  # type: ignore
 
 
 @dataclass
 class NvbenjoConfig:
     measure_memory: bool = True
     profile: bool = False
-    models: ty.Dict[str, ty.Any] = field(default_factory=lambda: dict())
+    models: dict[str, ty.Any] = field(default_factory=lambda: dict())
 
 
 @dataclass
@@ -74,7 +78,7 @@ class BenchConfig:
     output_dir: ty.Optional[str] = None
 
 
-def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> ty.Dict[str, BaseModelConfig]:
+def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[str, BaseModelConfig]:
     models = {}
     runtimes = {}
     for model_name, model in cfg.nvbenjo.models.items():
@@ -116,5 +120,24 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> ty.Dict
         models[model_name] = instantiate(model) if isinstance(model, DictConfig) else model
         if model_name in runtimes:
             models[model_name].runtime_options = runtimes[model_name]
+
+    # For onnx profiling we add a valid profiling prefix in the output directory if needed
+    for model_name, model in models.items():
+        if isinstance(model, OnnxModelConfig):
+            for runtime_name, runtime in model.runtime_options.items():
+                if runtime.enable_profiling:
+                    if runtime.profiling_prefix is None:
+                        runtime.profiling_prefix = os.path.join(
+                            cfg.output_dir, model_name, f"{model_name}_{runtime_name}_onnx_profile"
+                        )
+                    else:
+                        # make sure the relative path is inside the output dir
+                        if not os.path.abspath(runtime.profiling_prefix) == runtime.profiling_prefix:
+                            runtime.profiling_prefix = os.path.abspath(
+                                os.path.join(cfg.output_dir, runtime.profiling_prefix)
+                            )
+
+                    if runtime.profiling_prefix is not None:
+                        os.makedirs(os.path.dirname(runtime.profiling_prefix), exist_ok=True)
 
     return models

@@ -15,13 +15,13 @@ jobs:
           python-version-file: "pyproject.toml"
       
       - name: Install the project with onnx
-        run: uv sync --extra dev --extra onnx-cpu
+        run: uv sync --extra onnx-cpu
       
       - name: Run tests
         run: uv run pytest
 
       - name: Install the project without onnx
-        run: uv sync --extra dev
+        run: uv sync
       
       - name: Run tests
         run: uv run pytest

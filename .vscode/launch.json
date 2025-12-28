@@ -8,11 +8,11 @@
             "name": "debug",
             "type": "debugpy",
             "request": "launch",
-            "program": "main.py",
+            "module": "nvbenjo.cli",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "args": [
-                "-cn", "small"
+                "-cn", "onnxsilero"
             ]
         },
         {
@@ -25,7 +25,7 @@
             "cwd": "${workspaceFolder}",
             "module": "pytest",
             "args": [
-                "tests/test_cli.py"
+                "tests/test_onnx_cli.py::test_onnx[True]"
             ]
         },
     ]

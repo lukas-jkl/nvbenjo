@@ -69,11 +69,11 @@ def get_model(
 
 def run_model_with_input(model: nn.Module, input: TensorLike) -> TensorLike:
     if isinstance(input, (list, tuple)):
-        return model(*input)
+        return model(*input)  # type: ignore
     elif isinstance(input, dict):
-        return model(**input)
+        return model(**input)  # type: ignore
     else:
-        return model(input)
+        return model(input)  # type: ignore
 
 
 def transfer_to_device(result: ty.Any, to_device: torch.device) -> ty.Any:
@@ -176,7 +176,7 @@ def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch
 
 def measure_repeated_inference_timing(
     model: nn.Module,
-    sample: torch.Tensor,
+    sample: TensorLike,
     batch_size: int,
     model_device: torch.device,
     transfer_to_device_fn=transfer_to_device,

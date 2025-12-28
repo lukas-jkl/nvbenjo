@@ -8,11 +8,10 @@ import hydra
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
 
-from nvbenjo import plot
-from nvbenjo.benchmark import benchmark_models
-from nvbenjo.cfg import BenchConfig, instantiate_model_configs
-from nvbenjo.system_info import get_system_info
-from nvbenjo import console
+from . import console, plot
+from .benchmark import benchmark_models
+from .cfg import BenchConfig, instantiate_model_configs
+from .system_info import get_system_info
 from rich.logging import RichHandler
 
 logger = logging.getLogger(__name__)

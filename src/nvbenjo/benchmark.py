@@ -1,5 +1,6 @@
 import itertools
 import logging
+import typing as ty
 from typing import Any, Callable, Optional, Dict
 
 import numpy as np
@@ -212,6 +213,7 @@ def benchmark_model(
 
             model = load_model(model_cfg.type_or_path, device=device, runtime_config=runtime_cfg, **model_cfg.kwargs)
             if isinstance(model_cfg, TorchModelConfig):
+                batch: utils.TensorLike
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 
                 if num_model_parameters is None:
@@ -221,7 +223,7 @@ def benchmark_model(
                     model, precision=model_cfg.runtime_options[runtime_option_name].precision
                 )
                 if runtime_cfg.compile:
-                    model = torch.compile(model, **runtime_cfg.compile_kwargs)  # type: ignore
+                    model = torch.compile(model, **runtime_cfg.compile_kwargs)
 
                 if not isinstance(model, nn.Module):
                     raise ValueError(f"Expected a torch.nn.Module but got {type(model)}")
@@ -230,12 +232,21 @@ def benchmark_model(
                 if not set_dtype:
                     batch = torch_utils.apply_batch_precision(batch, precision=runtime_cfg.precision)
                 else:
-                    batch = {
-                        k: torch_utils.apply_batch_precision(v, precision=runtime_cfg.precision)
-                        if not set_dtype[k]
-                        else v
-                        for k, v in batch.items()
-                    }
+                    if not isinstance(batch, dict):
+                        raise ValueError(f"Batch {batch} must be a dict if set_dtype is used.")
+                    batch = ty.cast(
+                        dict[str, torch.Tensor],
+                        {
+                            k: (
+                                torch_utils.apply_batch_precision(
+                                    ty.cast(torch.Tensor, v), precision=runtime_cfg.precision
+                                )
+                                if not set_dtype[k]
+                                else ty.cast(torch.Tensor, v)
+                            )
+                            for k, v in batch.items()
+                        },
+                    )
 
                 with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)

@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = [{"name" = "lukas_jkl"}]
 description = "Benchmark utility for NVIDIA GPU's"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 dependencies = [
   "torchvision",
   "torchaudio",
@@ -20,6 +20,17 @@ dependencies = [
 ]
 [project.scripts]
 nvbenjo = "nvbenjo.cli:nvbenjo"
+#[project.optional-dependencies]
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "ipython",
+    "ty",
+    "nox",
+    "onnxscript",
+]
 [project.optional-dependencies]
 onnx-cpu = [
     "onnx>=1.14.0",
@@ -29,20 +40,22 @@ onnx-gpu = [
     "onnx>=1.14.0",
     "onnxruntime-gpu>=1.15.0",
 ]
-dev = [
-    "pytest",
-    "pytest-cov",
-    "ruff",
-    "ipython",
-    "pytest",
-    "ty",
-    "nox"
-]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 [tool.setuptools]
 include-package-data = true
-packages = ["nvbenjo"]
+[tool.setuptools.packages.find]
+where = ["src"]
 [tool.setuptools.package-data]
 nvbenjo = ["conf/*.yml", "conf/*.yaml"]
+
+[tool.ty.src]
+include = [
+    "src",
+]
+
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint.pydocstyle]

@@ -172,7 +172,8 @@ def test_torch_load_complex_multiinput(export_type):
                     args=(torch.randn(2, 10), torch.randn(2, 20)),
                     dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
                 )
-                torch.export.save(program, tmpfile)
+                torch.export.save(program, tmpfile.name)
+                torch.export.load(tmpfile.name)  # verify it can be loaded
             elif export_type == "torchscript":
                 m = torch.jit.script(model)
                 torch.jit.save(m, tmpfile)
