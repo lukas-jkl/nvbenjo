@@ -27,7 +27,6 @@ dev = [
     "pytest-cov",
     "ruff",
     "ipython",
-    "pytest",
     "ty",
     "nox",
     "onnxscript",
