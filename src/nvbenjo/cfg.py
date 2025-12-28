@@ -68,7 +68,6 @@ class OnnxModelConfig(BaseModelConfig):
 @dataclass
 class NvbenjoConfig:
     measure_memory: bool = True
-    profile: bool = False
     models: dict[str, ty.Any] = field(default_factory=lambda: dict())
 
 

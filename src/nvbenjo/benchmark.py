@@ -46,9 +46,7 @@ def _test_load_models(model_cfgs: Dict[str, BaseModelConfig]) -> None:
             loaded_types.append(model_cfg.type_or_path)
 
 
-def benchmark_models(
-    model_cfgs: Dict[str, BaseModelConfig], measure_memory: Optional[bool] = True, profile: Optional[bool] = False
-) -> pd.DataFrame:
+def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Optional[bool] = True) -> pd.DataFrame:
     _test_load_models(model_cfgs)
 
     with _get_progress_bar() as progress_bar:
@@ -57,9 +55,7 @@ def benchmark_models(
 
         for model_name, model_cfg in model_cfgs.items():
             progress_bar.update(model_task, description=f"Benchmarking {model_name}")
-            model_results = benchmark_model(
-                model_cfg, progress_bar=progress_bar, measure_memory=measure_memory, profile=profile
-            )
+            model_results = benchmark_model(model_cfg, progress_bar=progress_bar, measure_memory=measure_memory)
             model_results["model"] = model_name
             results.append(model_results)
             progress_bar.advance(model_task)
@@ -183,16 +179,12 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
 # TODO: !! two seperate functions torch and onnx
 def benchmark_model(
     model_cfg: BaseModelConfig,
-    profile: Optional[bool] = False,
     measure_memory: Optional[bool] = True,
     progress_bar: Optional[Progress] = None,
 ) -> pd.DataFrame:
     results = []
     num_model_parameters = None
     precision_batch_oom = {}
-
-    if profile:
-        raise NotImplementedError("Profiling is not yet implemented.")
 
     if progress_bar is None:
         progress_bar = _get_progress_bar()

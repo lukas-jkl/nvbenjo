@@ -40,7 +40,7 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     if len(models) == 0:
         logger.info("No models to benchmark, please specify a configuration or override via the command line.")
         return
-    results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory, profile=cfg.nvbenjo.profile)
+    results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory)
 
     if cfg.output_dir is not None:
         results.to_csv(join(output_dir, "out.csv"))
