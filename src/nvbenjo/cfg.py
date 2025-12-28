@@ -1,11 +1,13 @@
+import os
 import typing as ty
-from dataclasses import dataclass, field
 from abc import ABC
-
-from omegaconf import DictConfig, OmegaConf, open_dict
-from .utils import PrecisionType
-from hydra.utils import instantiate
 from contextlib import nullcontext
+from dataclasses import dataclass, field
+
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf, open_dict
+
+from .utils import PrecisionType
 
 
 @dataclass
@@ -24,6 +26,8 @@ class OnnxRuntimeConfig:
     intra_op_num_threads: int = 1
     inter_op_num_threads: int = 0
     log_severity_level: int = 2  # Warning
+    enable_profiling: bool = False
+    profiling_prefix: ty.Optional[str] = None
     provider_options: ty.Sequence[dict[ty.Any, ty.Any]] | None = None
 
 
@@ -116,5 +120,24 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
         models[model_name] = instantiate(model) if isinstance(model, DictConfig) else model
         if model_name in runtimes:
             models[model_name].runtime_options = runtimes[model_name]
+
+    # For onnx profiling we add a valid profiling prefix in the output directory if needed
+    for model_name, model in models.items():
+        if isinstance(model, OnnxModelConfig):
+            for runtime_name, runtime in model.runtime_options.items():
+                if runtime.enable_profiling:
+                    if runtime.profiling_prefix is None:
+                        runtime.profiling_prefix = os.path.join(
+                            cfg.output_dir, model_name, f"{model_name}_{runtime_name}_onnx_profile"
+                        )
+                    else:
+                        # make sure the relative path is inside the output dir
+                        if not os.path.abspath(runtime.profiling_prefix) == runtime.profiling_prefix:
+                            runtime.profiling_prefix = os.path.abspath(
+                                os.path.join(cfg.output_dir, runtime.profiling_prefix)
+                            )
+
+                    if runtime.profiling_prefix is not None:
+                        os.makedirs(os.path.dirname(runtime.profiling_prefix), exist_ok=True)
 
     return models

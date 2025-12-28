@@ -16,3 +16,5 @@ nvbenjo:
         DEFAULT:
           intra_op_num_threads: 2
           graph_optimization_level: ORT_ENABLE_BASIC
+          enable_profiling: true
+          profiling_prefix: "resnet_profile"

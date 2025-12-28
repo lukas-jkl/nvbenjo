@@ -46,6 +46,9 @@ def get_model(
     session_options.log_severity_level = runtime_config.log_severity_level
     session_options.intra_op_num_threads = runtime_config.intra_op_num_threads
     session_options.inter_op_num_threads = runtime_config.inter_op_num_threads
+    session_options.enable_profiling = runtime_config.enable_profiling
+    if runtime_config.enable_profiling and runtime_config.profiling_prefix is not None:
+        session_options.profile_file_prefix = runtime_config.profiling_prefix
     session_options.graph_optimization_level = getattr(
         ort.GraphOptimizationLevel,
         runtime_config.graph_optimization_level,  # type: ignore
