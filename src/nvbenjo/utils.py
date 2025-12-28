@@ -132,6 +132,10 @@ def get_rnd_from_shape_s(
         elif all(isinstance(si, (dict, DictConfig)) for si in shape):
             rnd_input = {}
             for si in shape:
+                # check is redundant but helps type checker
+                if not isinstance(si, (dict, DictConfig)):
+                    raise ValueError(f"Shape item {si} must be of type dict.")
+
                 # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
                 _check_shape_dict(si)
                 name = si["name"]
