@@ -4,7 +4,6 @@ defaults:
 
 nvbenjo:
   measure_memory: false
-  profile: false
   models:
     shufflenet:
       type_or_path: torchvision:shufflenet_v2_x0_5
@@ -19,3 +18,9 @@ nvbenjo:
       runtime_options:
         FP32:
           precision: FP32
+          enable_profiling: true
+          profiling_prefix: "some/prefix_"
+          profiler_kwargs:
+            record_shapes: true
+            with_stack: true
+

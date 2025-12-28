@@ -4,7 +4,6 @@ defaults:
 
 nvbenjo:
   measure_memory: true
-  profile: false
   models:
     dummytorchmodel:
       type_or_path: replaceme

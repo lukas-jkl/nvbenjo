@@ -15,6 +15,8 @@ nvbenjo:
         runtime_options:
           FP32:
             precision: FP32
+            enable_profiling: true
+            
           AMP_FP16:
             precision: AMP_FP16
           AMP_BFLOAT16:

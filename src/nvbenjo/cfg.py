@@ -15,6 +15,9 @@ class TorchRuntimeConfig:
     compile: bool = False
     compile_kwargs: dict = field(default_factory=dict)
     precision: PrecisionType = PrecisionType.FP32
+    enable_profiling: bool = False
+    profiling_prefix: ty.Optional[str] = None
+    profiler_kwargs: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -122,12 +125,12 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
 
     # For onnx profiling we add a valid profiling prefix in the output directory if needed
     for model_name, model in models.items():
-        if isinstance(model, OnnxModelConfig):
+        if isinstance(model, (OnnxModelConfig, TorchModelConfig)):
             for runtime_name, runtime in model.runtime_options.items():
                 if runtime.enable_profiling:
                     if runtime.profiling_prefix is None:
                         runtime.profiling_prefix = os.path.join(
-                            cfg.output_dir, model_name, f"{model_name}_{runtime_name}_onnx_profile"
+                            cfg.output_dir, model_name, f"{model_name}_{runtime_name}_profile"
                         )
                     else:
                         # make sure the relative path is inside the output dir
@@ -135,8 +138,6 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
                             runtime.profiling_prefix = os.path.abspath(
                                 os.path.join(cfg.output_dir, runtime.profiling_prefix)
                             )
-
-                    if runtime.profiling_prefix is not None:
-                        os.makedirs(os.path.dirname(runtime.profiling_prefix), exist_ok=True)
+                    os.makedirs(os.path.dirname(runtime.profiling_prefix), exist_ok=True)
 
     return models

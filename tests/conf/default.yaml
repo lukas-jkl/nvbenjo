@@ -4,4 +4,3 @@ defaults:
 
 nvbenjo:
   measure_memory: true
-  profile: false

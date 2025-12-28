@@ -1,5 +1,6 @@
 import itertools
 import logging
+import time
 import typing as ty
 from typing import Any, Callable, Optional, Dict
 
@@ -109,6 +110,7 @@ def _measure_timings(
     num_batches: int,
     progress_bar: Optional[Progress],
     timing_function: Callable = torch_utils.measure_repeated_inference_timing,
+    profiler: Optional[torch.profiler.profile] = None,
 ) -> pd.DataFrame:
     if progress_bar is not None:
         measure_task = progress_bar.add_task(
@@ -121,6 +123,8 @@ def _measure_timings(
             progress_bar.advance(measure_task)
         else:
             pass
+        if profiler is not None:
+            profiler.step()
 
     try:
         cur_raw_results = timing_function(
@@ -246,6 +250,22 @@ def benchmark_model(
                         memory_alloc = torch_utils.measure_memory_allocation(model, batch, device)
                     else:
                         memory_alloc = 0
+                    if runtime_cfg.enable_profiling:
+                        if "activities" not in runtime_cfg.profiler_kwargs:
+                            runtime_cfg.profiler_kwargs["activities"] = (
+                                [
+                                    torch.profiler.ProfilerActivity.CPU,
+                                    torch.profiler.ProfilerActivity.CUDA,
+                                ]
+                                if device.type == "cuda"
+                                else [torch.profiler.ProfilerActivity.CPU]
+                            )
+                        profiler = torch.profiler.profile(
+                            **runtime_cfg.profiler_kwargs,
+                        )
+                        profiler.start()
+                    else:
+                        profiler = None
                     cur_results = _measure_timings(
                         model=model,
                         batch=batch,
@@ -255,6 +275,12 @@ def benchmark_model(
                         progress_bar=progress_bar,
                         timing_function=torch_utils.measure_repeated_inference_timing,
                     )
+                    if profiler is not None:
+                        profiler.stop()
+                        time_str = time.strftime("%Y-%m-%d_%H-%M-%S")
+                        profiler.export_chrome_trace(
+                            f"{runtime_cfg.profiling_prefix}_{device}_{batch_size}_{time_str}.json"
+                        )
             elif isinstance(model_cfg, OnnxModelConfig):
                 from nvbenjo import onnx_utils
 

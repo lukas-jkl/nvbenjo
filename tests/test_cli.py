@@ -46,7 +46,7 @@ def _check_files(directory, files):
                     assert len(row) == len(header), f"Row in CSV file {file} does not match header length"
 
 
-def _check_run_files(cfg):
+def _check_run_files(cfg: omegaconf.DictConfig):
     expected_files = copy(EXPECTED_OUTPUT_FILES)
     for model_name in cfg.nvbenjo.models.keys():
         expected_files.append(join(model_name, "time_inference.png"))
@@ -61,6 +61,24 @@ def _check_run_files(cfg):
         expected_files.append(join("summary", "time_cpu_to_device.png"))
         expected_files.append(join("summary", "memory_bytes.png"))
     _check_files(cfg.output_dir, expected_files)
+    for model_name in cfg.nvbenjo.models.keys():
+        for runtime_name in cfg.nvbenjo.models[model_name].get("runtime_options", {}).keys():
+            if cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name].get("enable_profiling", False):
+                profile_prefix = cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name].get(
+                    "profiling_prefix", None
+                )
+                if profile_prefix is None:
+                    profile_prefix = join(
+                        cfg.output_dir,
+                        model_name,
+                        f"{model_name}_{runtime_name}_profile",
+                    )
+                else:
+                    profile_prefix = os.path.abspath(os.path.join(cfg.output_dir, profile_prefix))
+                profile_prefix_dir = os.path.dirname(profile_prefix)
+                assert os.path.isdir(profile_prefix_dir), f"Profiling directory {profile_prefix_dir} not found"
+                profile_files = os.listdir(profile_prefix_dir)
+                assert len(profile_files) > 0, f"No profiling files found in {profile_prefix}"
 
 
 def test_default():
@@ -252,7 +270,12 @@ def test_torch_load_complex_invalid_multiinput():
                                 "batch_sizes": [1, 2],
                                 "devices": ["cpu"],
                                 "runtime_options": {
-                                    "FP32": {"precision": "FP32", "compile": False},
+                                    "FP32": {
+                                        "precision": "FP32",
+                                        "compile": False,
+                                        "enable_profiling": True,
+                                        "profiler_kwargs": {"record_shapes": True, "with_stack": True},
+                                    },
                                 },
                                 "shape": [
                                     {"name": "x", "shape": ["B", 10], "type": "float", "min_max": [max, max * 2]},
@@ -284,7 +307,7 @@ def test_torch_load_complex_invalid_multiinput():
 def test_cli_cn_path_arg():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as cfg_tmpdir:
-            cfg_file = os.path.join(cfg_tmpdir, "small.yaml")
+            cfg_file = os.path.join(cfg_tmpdir, "smallasdf.yaml")
             shutil.copy2(os.path.join("tests", "conf", "small_single.yaml"), cfg_file)
             with tempfile.TemporaryDirectory() as tmpdir:
                 subprocess.run(
