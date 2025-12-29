@@ -220,7 +220,7 @@ def measure_repeated_inference_timing(
     sample: TensorLike,
     batch_size: int,
     model_device: torch.device,
-    transfer_to_device_fn: Callable=transfer_to_device,
+    transfer_to_device_fn: Callable = transfer_to_device,
     num_runs: int = 100,
     progress_callback: Optional[Callable] = None,
 ) -> pd.DataFrame:
