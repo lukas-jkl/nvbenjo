@@ -11,10 +11,9 @@ nvbenjo:
         num_warmup_batches: 1
         num_batches: 2
         batch_sizes: [8, 16]
-        devices:
-        - "cpu"
+        devices: ["cpu"]
         runtime_options:
-          FP32:
+          run_FP32:
             precision: FP32
-          FP16:
+          run_FP16:
             precision: FP16

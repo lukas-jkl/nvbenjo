@@ -21,6 +21,29 @@ logger = logging.getLogger(__name__)
 def get_model(
     type_or_path: str, device: torch.device, runtime_config: TorchRuntimeConfig, verbose=False, **kwargs
 ) -> ty.Any:
+    """Load PyTorch model.
+
+    Parameters
+    ----------
+    type_or_path : str
+        Model type or path. This can be:
+
+        - a valid path to a saved torch model (saved with torch.save or torch.jit.save)
+        - a valid huggingface AutoModel (named 'huggingface:<model-name>') see https://huggingface.co/docs/transformers/model_doc/auto
+        - a valid torchvision model (named 'torchvision:<model-name>') see `torchvision.models.list_models()`
+
+    device : torch.device
+        Device to load the model onto.
+    runtime_config : TorchRuntimeConfig
+        Runtime configuration for the model.
+    verbose : bool, optional
+        Whether to print verbose output, by default False
+
+    Returns
+    -------
+    ty.Any
+        Loaded model.
+    """
     type_or_path = os.path.expanduser(type_or_path)
     if os.path.isfile(type_or_path):
         if verbose and console is not None:
@@ -151,6 +174,24 @@ def get_model_parameters(model: nn.Module) -> int:
 
 
 def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch.device, iterations: int = 3) -> int:
+    """Measure the memory usage during inference
+
+    Parameters
+    ----------
+    model : nn.Module
+        The model to benchmark.
+    batch : TensorLike
+        Sample input to the model.
+    device : torch.device
+        The device where the model is located and shall be used for benchmarking.
+    iterations : int, optional
+        Number of iterations to run for measuring memory allocation, by default 3
+
+    Returns
+    -------
+    int
+        Maximum memory allocated during inference in bytes.
+    """
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device=device)
     # before_run_allocation = torch.cuda.memory_allocated(device=device)
@@ -179,10 +220,34 @@ def measure_repeated_inference_timing(
     sample: TensorLike,
     batch_size: int,
     model_device: torch.device,
-    transfer_to_device_fn=transfer_to_device,
+    transfer_to_device_fn: Callable=transfer_to_device,
     num_runs: int = 100,
     progress_callback: Optional[Callable] = None,
 ) -> pd.DataFrame:
+    """Measure inference times.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The model to benchmark.
+    sample : TensorLike
+        Sample input to the model.
+    batch_size : int
+        The batch size of the sample.
+    model_device : torch.device
+        The device where the model is located and shall be used for benchmarking.
+    transfer_to_device_fn : Callable, optional
+        Function to transfer data to the specified device, by default transfer_to_device
+    num_runs : int, optional
+        Number of inference runs to perform, by default 100
+    progress_callback : Optional[Callable], optional
+        Callback function to report progress, by default None
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing timing results.
+    """
     time_cpu_to_device = []
     time_inference = []
     time_device_to_cpu = []

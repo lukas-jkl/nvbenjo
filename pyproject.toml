@@ -30,6 +30,9 @@ dev = [
     "ty",
     "nox",
     "onnxscript",
+    "sphinx",
+    "myst-parser",
+    "pydata-sphinx-theme",
 ]
 [project.optional-dependencies]
 onnx-cpu = [

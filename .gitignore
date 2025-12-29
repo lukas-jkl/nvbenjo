@@ -15,3 +15,6 @@ wheels/
 # Hydra outputs
 nvbenjo/outputs
 outputs
+
+# Sphinx build files
+docs/_build/
