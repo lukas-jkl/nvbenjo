@@ -50,8 +50,9 @@ def visualize_results(
 
     if len(results.device.unique()) == 1 and len(results.model.unique()) > 1:
         for key in keys:
-            sns.catplot(data=results, y=key, hue=hue, col=col, kind=kind, row="model", sharey=True,
-                        palette="dark", alpha=0.6)
+            sns.catplot(
+                data=results, y=key, hue=hue, col=col, kind=kind, row="model", sharey=True, palette="dark", alpha=0.6
+            )
             device_stem = f"{device}_" if mult_devices else ""
             os.makedirs(join(output_dir, "summary"), exist_ok=True)
             plt.savefig(join(output_dir, "summary", f"summary_{key}.png"))
