@@ -55,7 +55,7 @@ class NvbenjoConfig:
 
     Parameters
     ----------
-    measure_memorymetadata
+    measure_memory : bool
         Whether to measure GPU memory allocation during benchmarking.
     models: dict[str, TorchModelConfig | OnnxModelConfig]
         Dictionary mapping model names to their configurations.
@@ -119,8 +119,8 @@ class OnnxRuntimeConfig:
     Parameters
     ----------
     execution_providers : tuple of str or None
-        Tuple of execution providers to use (e.g., ('CPUExecutionProvider', 'CUDAExecution
-        Provider')). If None, uses the default provider.
+        Tuple of execution providers to use (e.g., ('CPUExecutionProvider',
+        'CUDAExecutionProvider')). If None, uses the default provider.
     graph_optimization_level : str
         Graph optimization level for ONNX Runtime. Options are 'ORT_ENABLE_ALL', 'ORT_ENABLE_LAYOUT',
         'ORT_ENABLE_BASIC', 'ORT_DISABLE_ALL'.

@@ -232,7 +232,8 @@ def measure_repeated_inference_timing(
     num_runs : int, optional
         Number of runs to perform for timing, by default 100
     progress_callback : ty.Optional[ty.Callable], optional
-        Callback function for progress updates, by default None
+        Callback function for p
+
     Returns
     -------
     pd.DataFrame
