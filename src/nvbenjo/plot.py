@@ -33,7 +33,16 @@ def visualize_results(
         for device in results.device.unique():
             model_device_results = results[(results.model == model) & (results.device == device)]
             for key in keys:
-                sns.catplot(data=model_device_results, x="model", y=key, hue=hue, col=col, kind=kind)
+                sns.catplot(
+                    data=model_device_results,
+                    x="model",
+                    y=key,
+                    hue=hue,
+                    col=col,
+                    kind=kind,
+                    palette="dark",
+                    alpha=0.6,
+                )
                 device_stem = f"{device}_" if mult_devices else ""
                 os.makedirs(join(output_dir, model), exist_ok=True)
                 plt.savefig(join(output_dir, model, f"{device_stem}{key}.png"))
@@ -41,7 +50,8 @@ def visualize_results(
 
     if len(results.device.unique()) == 1 and len(results.model.unique()) > 1:
         for key in keys:
-            sns.catplot(data=results, y=key, hue=hue, col=col, kind=kind, row="model", sharey=True)
+            sns.catplot(data=results, y=key, hue=hue, col=col, kind=kind, row="model", sharey=True,
+                        palette="dark", alpha=0.6)
             device_stem = f"{device}_" if mult_devices else ""
             os.makedirs(join(output_dir, "summary"), exist_ok=True)
             plt.savefig(join(output_dir, "summary", f"summary_{key}.png"))
