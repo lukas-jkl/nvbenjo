@@ -1,5 +1,7 @@
 ## Configuration
 
+Nvbenjo uses [Hydra](https://hydra.cc/) for configuration using the dataclasses listed below. 
+
 ### Main configuration classes
 
 ```{eval-rst}

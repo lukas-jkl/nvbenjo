@@ -45,3 +45,29 @@ nvbenjo -cn="/my/config/path/myconfig.yaml" nvbenjo.models.mymodel.num_batches=1
    :lines: 1-45
    :caption: Example Configuration
 ```
+
+### Usage with Python API
+
+See the [Python API Reference](python_api.md) for detailed documentation of all available functions and classes and [Configuration Reference](configuration.md) for config objects.
+
+
+```python
+from nvbenjo import cfg
+from nvbenjo.utils import PrecisionType
+from nvbenjo import benchmark
+
+
+model_cfg = cfg.TorchModelConfig(
+    name="torch-shufflenet-v2-x0-5",
+    type_or_path="torchvision:shufflenet_v2_x0_5",
+    shape=(("B", 3, 224, 224),),
+    devices=["cpu"],
+    batch_sizes=[1],
+    num_warmup_batches=1,
+    num_batches=2,
+    runtime_options={
+        "test1": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32),
+    },
+)
+results = benchmark.benchmark_models({"model_1": model_cfg})
+```

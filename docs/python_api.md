@@ -5,8 +5,6 @@
 ```{eval-rst}
 .. autofunction:: nvbenjo.benchmark.benchmark_models
 
-.. autofunction:: nvbenjo.benchmark.benchmark_model
-
 .. autofunction:: nvbenjo.benchmark.load_model
 ```
 
