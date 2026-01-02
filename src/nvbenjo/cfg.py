@@ -290,7 +290,7 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
                                 cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]
                             )
                             runtimes[model_name][runtime_name].precision = PrecisionType[
-                                cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["precision"]
+                                cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["precision"].upper()
                             ]
 
         models[model_name] = instantiate(model) if isinstance(model, DictConfig) else model
