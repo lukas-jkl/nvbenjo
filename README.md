@@ -23,6 +23,9 @@ nvbenjo -cn="/my/config/path/myconfig.yaml"
 
 # override single arguments of your config
 nvbenjo -cn="/my/config/path/myconfig.yaml" nvbenjo.models.mymodel.num_batches=10
+
+# show current config and help
+nvbenjo -cn="/my/config/path/myconfig.yaml" --help
 ```
 
 ## Development
