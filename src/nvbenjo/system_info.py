@@ -31,6 +31,8 @@ def _get_architecture_name_from_version(version: int) -> str:
 def get_gpu_info() -> list[dict[str, Any]]:
     """Retrieve information about GPUs in the system.
 
+    Includes information such as name, architecture, memory, clock speeds, CUDA capability, and driver version.
+
     Returns
     -------
     list[dict[str, Any]]
