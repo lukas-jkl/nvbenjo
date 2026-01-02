@@ -66,7 +66,10 @@ html_theme_options = {
     "navigation_depth": 3,
     "show_toc_level": 2,
 }
-
+# Remove left sidebar (don't need it for now)
+html_sidebars = {
+  "**": []
+}
 html_show_sourcelink = False
 html_copy_source = False
 
