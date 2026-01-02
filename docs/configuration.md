@@ -1,8 +1,8 @@
-## Configuration
+# Configuration
 
 Nvbenjo uses [Hydra](https://hydra.cc/) for configuration using the dataclasses listed below. 
 
-### Main configuration classes
+## Main configuration classes
 
 ```{eval-rst}
 .. autoclass:: nvbenjo.cfg.BenchConfig
@@ -12,7 +12,7 @@ Nvbenjo uses [Hydra](https://hydra.cc/) for configuration using the dataclasses 
    :members:
 ```
 
-### Pytorch
+## Pytorch
 
 ```{eval-rst}
 .. autoclass:: nvbenjo.cfg.TorchModelConfig
@@ -23,7 +23,7 @@ Nvbenjo uses [Hydra](https://hydra.cc/) for configuration using the dataclasses 
 
 ```
 
-### Onnx
+## Onnx
 
 ```{eval-rst}
 .. autoclass:: nvbenjo.cfg.OnnxModelConfig

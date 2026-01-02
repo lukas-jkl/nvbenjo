@@ -42,7 +42,7 @@ nvbenjo -cn="/my/config/path/myconfig.yaml" nvbenjo.models.mymodel.num_batches=1
 ```{eval-rst}
 .. literalinclude:: ../src/nvbenjo/conf/example.yaml
    :language: yaml
-   :lines: 1-45
+   :lines: 1-43
    :caption: Example Configuration
 ```
 
