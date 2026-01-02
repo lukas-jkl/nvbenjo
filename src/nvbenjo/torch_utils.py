@@ -43,6 +43,13 @@ def get_model(
     -------
     ty.Any
         Loaded model.
+
+    Examples
+    --------
+    >>> model = get_model("torchvision:resnet18", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig())
+    >>> model = get_model("/path/to/model.pth", device=torch.device("cuda"), runtime_config=TorchRuntimeConfig())
+    >>> model = get_model("/path/to/jitmodel.jit", device=torch.device("cuda"), runtime_config=TorchRuntimeConfig())
+    >>> model = get_model("huggingface:bert-base-uncased", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig())
     """
     type_or_path = os.path.expanduser(type_or_path)
     if os.path.isfile(type_or_path):
@@ -174,7 +181,7 @@ def get_model_parameters(model: nn.Module) -> int:
 
 
 def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch.device, iterations: int = 3) -> int:
-    """Measure the memory usage during inference
+    """Measure the peak memory usage during inference
 
     Parameters
     ----------
@@ -247,6 +254,26 @@ def measure_repeated_inference_timing(
     -------
     pd.DataFrame
         DataFrame containing timing results.
+
+    Examples
+    --------
+    Measure Inference::
+
+        import torch
+        from nvbenjo.torch_utils import measure_repeated_inference_timing
+        from nvbenjo.torch_utils import get_model
+        from nvbenjo.cfg import TorchRuntimeConfig
+
+        model = get_model("torchvision:resnet18", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig())
+        sample = torch.randn(2, 3, 224, 224)  # batch size 2
+        results = measure_repeated_inference_timing(
+            model=model,
+            sample=sample,
+            batch_size=2,
+            model_device=torch.device("cpu"),
+            num_runs=2
+        )
+
     """
     time_cpu_to_device = []
     time_inference = []

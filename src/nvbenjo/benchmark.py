@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def load_model(
     type_or_path: str, device: torch.device, runtime_config: TorchRuntimeConfig | OnnxRuntimeConfig, **kwargs
 ) -> Any:
-    """Load a model
+    """Load a model, may be a PyTorch or ONNX model based on the runtime configuration.
 
     Parameters
     ----------
@@ -76,6 +76,29 @@ def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Opt
     -------
     pd.DataFrame
         A DataFrame containing the benchmarking results
+
+        
+    Examples
+    --------
+    Basic usage with single PyTorch model::
+    
+        from nvbenjo import cfg
+        from nvbenjo.utils import PrecisionType
+        from nvbenjo import benchmark
+
+        model_cfg = cfg.TorchModelConfig(
+            name="torch-shufflenet-v2-x0-5",
+            type_or_path="torchvision:shufflenet_v2_x0_5",
+            shape=(("B", 3, 224, 224),),
+            devices=["cpu"],
+            batch_sizes=[1],
+            num_warmup_batches=1,
+            num_batches=2,
+            runtime_options={
+                "test1": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32),
+            },
+        )
+        results = benchmark.benchmark_models({"model_1": model_cfg})
     """
     _test_load_models(model_cfgs)
 
