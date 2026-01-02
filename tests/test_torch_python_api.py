@@ -25,6 +25,9 @@ def test_pytorch_simple():
                     profiler_kwargs={"profile_memory": True, "record_shapes": True},
                 ),
             },
+            custom_batchmetrics={
+                "fps": 1.0,
+            },
         )
         results = benchmark.benchmark_models({"model_1": model_cfg})
         assert not results.empty

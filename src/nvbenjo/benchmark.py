@@ -97,6 +97,9 @@ def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Opt
             runtime_options={
                 "test1": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32),
             },
+            custom_batchmetrics={
+                "fps": 1.0,
+            },
         )
         results = benchmark.benchmark_models({"model_1": model_cfg})
     """
@@ -110,6 +113,8 @@ def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Opt
             progress_bar.update(model_task, description=f"Benchmarking {model_name}")
             model_results = benchmark_model(model_cfg, progress_bar=progress_bar, measure_memory=measure_memory)
             model_results["model"] = model_name
+            if model_cfg.custom_batchmetrics:
+                model_results = utils.calculate_batchmetrics(model_results, model_cfg.custom_batchmetrics)
             results.append(model_results)
             progress_bar.advance(model_task)
 

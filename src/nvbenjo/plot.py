@@ -33,20 +33,21 @@ def visualize_results(
         for device in results.device.unique():
             model_device_results = results[(results.model == model) & (results.device == device)]
             for key in keys:
-                sns.catplot(
-                    data=model_device_results,
-                    x="model",
-                    y=key,
-                    hue=hue,
-                    col=col,
-                    kind=kind,
-                    palette="dark",
-                    alpha=0.6,
-                )
-                device_stem = f"{device}_" if mult_devices else ""
-                os.makedirs(join(output_dir, model), exist_ok=True)
-                plt.savefig(join(output_dir, model, f"{device_stem}{key}.png"))
-                plt.close()
+                if key in model_device_results.columns:
+                    sns.catplot(
+                        data=model_device_results,
+                        x="model",
+                        y=key,
+                        hue=hue,
+                        col=col,
+                        kind=kind,
+                        palette="dark",
+                        alpha=0.6,
+                    )
+                    device_stem = f"{device}_" if mult_devices else ""
+                    os.makedirs(join(output_dir, model), exist_ok=True)
+                    plt.savefig(join(output_dir, model, f"{device_stem}{key}.png"))
+                    plt.close()
 
     if len(results.device.unique()) == 1 and len(results.model.unique()) > 1:
         for key in keys:
@@ -96,9 +97,7 @@ def print_system_info(system_info: dict):
     console.print(Panel(content, title=title, border_style="blue", padding=(1, 4)))
 
 
-def print_results(
-    results: pd.DataFrame,
-):
+def print_results(results: pd.DataFrame, custom_metric_keys: List[str] = []):
     console.print("\n")
     for model in results.model.unique():
         model_results = results[results.model == model]
@@ -132,6 +131,8 @@ def print_results(
                     print_result[column] = print_result[column].apply(format_num, bytes=True)
                 elif column == "device":
                     print_result[column] = print_result[column].apply(lambda x: f"{x}")
+                elif column in custom_metric_keys:
+                    print_result[column] = print_result[column].apply(lambda x: f"{x:.3f}")
 
             # Add columns to the table
             for col in print_result.columns:

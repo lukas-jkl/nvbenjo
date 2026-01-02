@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as ty
+import pandas as pd
 from enum import Enum
 from omegaconf.listconfig import ListConfig
 from omegaconf.dictconfig import DictConfig
@@ -172,3 +173,23 @@ def get_rnd_from_shape_s(
         ) from e
 
     return rnd_input, set_individual_types
+
+
+def calculate_batchmetrics(results: pd.DataFrame, custom_batchmetrics: dict[str, float]) -> pd.DataFrame:
+    """Calculate custom batch metrics and add them to the results DataFrame.
+
+    Parameters
+    ----------
+    results : pd.DataFrame
+        The benchmark results DataFrame.
+    custom_batchmetrics : dict[str, float]
+        Dictionary of custom batch metrics to calculate. The key is the metric name and the value is the multiplier.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated results DataFrame with custom batch metrics added.
+    """
+    for metric_name, value in custom_batchmetrics.items():
+        results[metric_name] = value / results["time_total_batch_normalized"]
+    return results

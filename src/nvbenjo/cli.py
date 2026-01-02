@@ -47,11 +47,23 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
         with open(join(output_dir, "config.yaml"), "w") as f:
             f.write(OmegaConf.to_yaml(cfg))
 
+    custom_metric_keys = list(set(sum([list(mcfg.custom_batchmetrics.keys()) for mcfg in models.values()], [])))
     if cfg.output_dir is not None:
         logger.info("Generating plots...")
-        plot.visualize_results(results, output_dir=output_dir)
+        plot.visualize_results(
+            results,
+            keys=[
+                "time_cpu_to_device",
+                "time_device_to_cpu",
+                "time_inference",
+                "time_total_batch_normalized",
+                "memory_bytes",
+            ]
+            + custom_metric_keys,
+            output_dir=output_dir,
+        )
     plot.print_system_info(system_info)
-    plot.print_results(results)
+    plot.print_results(results, custom_metric_keys=custom_metric_keys)
     logger.info(f"Benchmark finished, outputs in: {output_dir}")
 
 

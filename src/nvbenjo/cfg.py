@@ -34,7 +34,16 @@ class BaseModelConfig(ABC):
         Tuple of device names to benchmark on (e.g., 'cpu', 'cuda:0').
     runtime_options : dict[str, ty.Any]
         Dictionary mapping runtime names to their specific runtime configurations.
-
+    custom_batchmetrics : dict[str, float]
+        Dictionary of custom batch metrics to include in the benchmark results.
+        These are calculated as `value / time_total_batch_normalized`.
+        For example if each batch is a frame you can calculate FPS as:
+            custom_batchmetrics:
+                fps: 1.0
+                batch-per-second: 1.0
+        or if each batch is 3s of audio you can calculate the real time factor as:
+            custom_batchmetrics:
+                real-time-factor: 1/3
     """
 
     name: str = "resnet"
@@ -46,6 +55,7 @@ class BaseModelConfig(ABC):
     batch_sizes: tuple = (16, 32)
     devices: tuple[str] = ("cpu",)
     runtime_options: dict[str, ty.Any] = field(default_factory=dict)
+    custom_batchmetrics: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass

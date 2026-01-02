@@ -2,6 +2,7 @@ import csv
 import os
 import shutil
 import subprocess
+import pandas as pd
 import tempfile
 import warnings
 from copy import copy
@@ -15,9 +16,10 @@ from hydra import compose, initialize
 
 from nvbenjo.cli import run
 
+DATA_FILE = "out.csv"
 EXPECTED_OUTPUT_FILES = [
     "config.yaml",
-    "out.csv",
+    DATA_FILE,
 ]
 
 
@@ -79,6 +81,13 @@ def _check_run_files(cfg: omegaconf.DictConfig):
                 assert os.path.isdir(profile_prefix_dir), f"Profiling directory {profile_prefix_dir} not found"
                 profile_files = os.listdir(profile_prefix_dir)
                 assert len(profile_files) > 0, f"No profiling files found in {profile_prefix}"
+    results = pd.read_csv(join(cfg.output_dir, DATA_FILE))
+    assert not results.empty, "Results CSV is empty"
+    for model_name, model_cfg in cfg.nvbenjo.models.items():
+        assert model_name in results.model.to_numpy(), "Model column not found in results"
+        custom_metric_keys = model_cfg.get("custom_batchmetrics", {})
+        for key in custom_metric_keys:
+            assert key in results.columns, f"Custom batch metric {key} not found in results"
 
 
 def test_default():

@@ -17,3 +17,5 @@ nvbenjo:
             precision: FP32
           run_FP16:
             precision: FP16
+        custom_batchmetrics:
+          fps: 1.0
