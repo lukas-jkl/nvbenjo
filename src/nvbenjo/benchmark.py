@@ -77,11 +77,11 @@ def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Opt
     pd.DataFrame
         A DataFrame containing the benchmarking results
 
-        
+
     Examples
     --------
     Basic usage with single PyTorch model::
-    
+
         from nvbenjo import cfg
         from nvbenjo.utils import PrecisionType
         from nvbenjo import benchmark
