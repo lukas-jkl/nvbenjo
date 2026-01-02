@@ -13,10 +13,18 @@ nvbenjo:
         num_warmup_batches: 5
         num_batches: 20
         batch_sizes: [1, 8, 16, 128]
-        devices: ["cuda:0", "cpu"]
+
+        # Specify the execution providers to use directly
         runtime_options:
-          DEFAULT:
+          DEFAULT_CPU:
+            execution_providers: ["CPUExecutionProvider"]
             intra_op_num_threads: 4
             graph_optimization_level: ORT_ENABLE_EXTENDED
             enable_profiling: true
-            # profiling_prefix: "silero_profile/silero"
+            profiling_prefix: "silero_profile/silero"
+          DEFAULT_CUDA:
+            execution_providers: ["CUDAExecutionProvider"]
+            intra_op_num_threads: 4
+            graph_optimization_level: ORT_ENABLE_EXTENDED
+            enable_profiling: true
+            profiling_prefix: "silero_profile/silero_cuda"

@@ -1,0 +1,44 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+    # Specify a PyTorch model
+    shufflenet_torch:
+      # Directly uses a model part of torchvision but you may also specify a local path or a Hugging Face model identifier
+      type_or_path: torchvision:shufflenet_v2_x0_5
+      kwargs: {}
+      shape: [B, 3, 224, 224]
+      num_warmup_batches: 1
+      num_batches: 2
+      # You may specify multiple batch sizes to benchmark
+      batch_sizes: [1, 2]
+      # You may also specify multiple devices to benchmark
+      devices: ["cuda:0"]
+      # Specify different runtime options to benchmark with different precisions or settings
+      # You may also use `amp`, `amp_fp16`, `amp_bfloat16` for automatic mixed precision
+      runtime_options:
+        run_FP32:
+          compile: false
+          precision: fp32
+        run_FP16:
+          precision: fp16
+        
+
+    # Specify an ONNX model
+    resnet_onnx:
+      # wget https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/resnet/model/resnet50-v2-7.onnx?download= ~/Downloads/resnet50-v2-7.onnx
+      type_or_path: ~/Downloads/resnet50-v2-7.onnx
+      # Input shape can also be specified using a dictionary with input type and min-max values
+      shape: [{"name": "data", "shape": [B, 3, 224, 224], "type": "float", "min_max": [0, 1]}]
+      num_warmup_batches: 3
+      num_batches: 2
+      batch_sizes: [1, 8, 16, 32]
+      devices: ["cuda:0"]
+      runtime_options:
+        DEFAULT:
+          intra_op_num_threads: 2
+          graph_optimization_level: ORT_ENABLE_BASIC
+          enable_profiling: true
+          profiling_prefix: "resnet_profile"

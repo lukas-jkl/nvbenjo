@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "args": [
-                "-cn", "onnxsilero"
+                "-cn", "/home/lukas/Documents/git-repos/nvbenjo/src/nvbenjo/conf/onnxsilero.yaml"
             ]
         },
         {
@@ -25,7 +25,7 @@
             "cwd": "${workspaceFolder}",
             "module": "pytest",
             "args": [
-                "tests/test_onnx_cli.py::test_onnx[True]"
+                "tests/test_cli.py::test_cli_cn_path_arg"
             ]
         },
     ]

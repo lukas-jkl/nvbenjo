@@ -103,19 +103,3 @@ nvbenjo:
             precision: AMP_FP16
           AMP_BFLOAT16:
             precision: AMP_BFLOAT16
-
-      # llama:
-      #   type_or_path: huggingface:openlm-research/open_llama_7b
-      #   kwargs: {}
-      #   shape: [{"name": "input_ids", "shape": [B, 90], "type": "long", min_max: [0, 200]}]
-      #   num_warmup_batches: 5
-      #   num_batches: 20
-      #   batch_sizes: [1, 2]
-      #   devices: ["cuda:0"]
-      #   runtime_options:
-      #     BFLOAT16:
-      #       compile: false
-      #       precision: BFLOAT16
-      #     FP32:
-      #       compile: false
-      #       precision: FP32

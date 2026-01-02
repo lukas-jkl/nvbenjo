@@ -25,6 +25,24 @@ from .utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, ge
 def get_model(
     type_or_path: str, device: torch.device, runtime_config: OnnxRuntimeConfig, **kwargs
 ) -> ort.InferenceSession:
+    """Load a onnx model into InferenceSession.
+
+    Parameters
+    ----------
+    type_or_path : str
+        Path to the ONNX model file.
+    device : torch.device
+        Device to run the ONNX model on.
+    runtime_config : OnnxRuntimeConfig
+        Runtime configuration for the ONNX model.
+    **kwargs
+        Additional keyword arguments to pass to the InferenceSession.
+
+    Returns
+    -------
+    ort.InferenceSession
+        Loaded ONNX InferenceSession.
+    """
     type_or_path = os.path.expanduser(type_or_path)
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
@@ -82,6 +100,24 @@ def _sample_gpu_memory(
 def measure_memory_allocation(
     model: ort.InferenceSession, sample: dict[str, torch.Tensor], device: torch.device, iterations: int = 3
 ) -> int:
+    """Measure the memory usage during inference
+
+    Parameters
+    ----------
+    model : ort.InferenceSession
+        The ONNX model to benchmark.
+    sample : dict[str, torch.Tensor]
+        Sample input data for the model.
+    device : torch.device
+        Device to run the model on.
+    iterations : int, optional
+        Number of iterations to run for measuring memory allocation, by default 3
+
+    Returns
+    -------
+    int
+        Maximum memory allocated during inference in bytes.
+    """
     max_mem = [-1]
     stop_event = threading.Event()
 
@@ -175,10 +211,34 @@ def measure_repeated_inference_timing(
     sample: dict[str, torch.Tensor],
     batch_size: int,
     model_device: torch.device,
-    transfer_to_device_fn=transfer_to_device,
+    transfer_to_device_fn: ty.Callable = transfer_to_device,
     num_runs: int = 100,
     progress_callback: ty.Optional[ty.Callable] = None,
 ) -> pd.DataFrame:
+    """Measure inference times.
+
+    Parameters
+    ----------
+    model : ort.InferenceSession
+        The ONNX model to benchmark.
+    sample : dict[str, torch.Tensor]
+        Sample input data for the model.
+    batch_size : int
+        Batch size for the input data.
+    model_device : torch.device
+        Device to run the model on.
+    transfer_to_device_fn : Callable, optional
+        Function to transfer data to the device, by default transfer_to_device
+    num_runs : int, optional
+        Number of runs to perform for timing, by default 100
+    progress_callback : ty.Optional[ty.Callable], optional
+        Callback function for p
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing timing results.
+    """
     time_cpu_to_device = []
     time_inference = []
     time_device_to_cpu = []

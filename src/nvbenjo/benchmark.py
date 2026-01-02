@@ -21,6 +21,22 @@ logger = logging.getLogger(__name__)
 def load_model(
     type_or_path: str, device: torch.device, runtime_config: TorchRuntimeConfig | OnnxRuntimeConfig, **kwargs
 ) -> Any:
+    """Load a model, may be a PyTorch or ONNX model based on the runtime configuration.
+
+    Parameters
+    ----------
+    type_or_path : str
+        String specifying the model type or path
+    device : torch.device
+        Device to load the model onto
+    runtime_config : :class:`~nvbenjo.cfg.TorchRuntimeConfig` or :class:`~nvbenjo.cfg.OnnxRuntimeConfig`
+        Runtime configuration for the model
+
+    Returns
+    -------
+    Any
+        Loaded model instance
+    """
     match runtime_config:
         case OnnxRuntimeConfig():
             from nvbenjo import onnx_utils
@@ -48,6 +64,42 @@ def _test_load_models(model_cfgs: Dict[str, BaseModelConfig]) -> None:
 
 
 def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Optional[bool] = True) -> pd.DataFrame:
+    """Benchmark the given models.
+
+    Parameters
+    ----------
+    model_cfgs : Dict[str, :class:`~nvbenjo.cfg.TorchModelConfig` | :class:`~nvbenjo.cfg.OnnxModelConfig`]
+    measure_memory : bool, optional
+        Whether to measure memory usage during benchmarking, by default True
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the benchmarking results
+
+
+    Examples
+    --------
+    Basic usage with single PyTorch model::
+
+        from nvbenjo import cfg
+        from nvbenjo.utils import PrecisionType
+        from nvbenjo import benchmark
+
+        model_cfg = cfg.TorchModelConfig(
+            name="torch-shufflenet-v2-x0-5",
+            type_or_path="torchvision:shufflenet_v2_x0_5",
+            shape=(("B", 3, 224, 224),),
+            devices=["cpu"],
+            batch_sizes=[1],
+            num_warmup_batches=1,
+            num_batches=2,
+            runtime_options={
+                "test1": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32),
+            },
+        )
+        results = benchmark.benchmark_models({"model_1": model_cfg})
+    """
     _test_load_models(model_cfgs)
 
     with _get_progress_bar() as progress_bar:
@@ -186,6 +238,22 @@ def benchmark_model(
     measure_memory: Optional[bool] = True,
     progress_bar: Optional[Progress] = None,
 ) -> pd.DataFrame:
+    """Benchmark one model configuration.
+
+    Parameters
+    ----------
+    model_cfg : :class:`~nvbenjo.cfg.TorchModelConfig` or :class:`~nvbenjo.cfg.OnnxModelConfig`
+        Model configuration to benchmark
+    measure_memory : bool, optional
+        Whether to measure memory usage during benchmarking, by default True
+    progress_bar : Progress, optional
+        Progress bar instance to display benchmarking progress, by default None
+
+    Returns
+    -------
+    pd.DataFrame
+        Benchmarking results as a pandas DataFrame
+    """
     results = []
     num_model_parameters = None
     precision_batch_oom = {}

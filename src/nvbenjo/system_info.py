@@ -29,6 +29,15 @@ def _get_architecture_name_from_version(version: int) -> str:
 
 
 def get_gpu_info() -> list[dict[str, Any]]:
+    """Retrieve information about GPUs in the system.
+
+    Includes information such as name, architecture, memory, clock speeds, CUDA capability, and driver version.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        A list of dictionaries containing GPU information.
+    """
     pynvml.nvmlInit()
     device_count = pynvml.nvmlDeviceGetCount()
     infos = []
@@ -64,6 +73,15 @@ def get_gpu_power_usage(device_index: int) -> float:
 
 
 def get_system_info() -> dict[str, Any]:
+    """Retrieve system information.
+
+    Collects information about the operating system, CPU, memory, and GPU.
+
+    Returns
+    -------
+    dict[str, Any]
+        A dictionary containing system information.
+    """
     sys = uname()
     cpu = get_cpu_info()
     svmem = psutil.virtual_memory()

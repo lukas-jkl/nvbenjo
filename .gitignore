@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+.coverage
 
 # Log files
 *.log
@@ -15,3 +16,6 @@ wheels/
 # Hydra outputs
 nvbenjo/outputs
 outputs
+
+# Sphinx build files
+docs/_build/
