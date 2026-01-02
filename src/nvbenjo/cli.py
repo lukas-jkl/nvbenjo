@@ -22,7 +22,7 @@ cs.store(name="base_config", node=BenchConfig)
 
 
 @hydra.main(version_base=None, config_path=os.path.join(files("nvbenjo").joinpath("conf")), config_name="default")
-def nvbenjo(cfg: ty.Union[BenchConfig, DictConfig]):
+def _run_nvbenjo(cfg: ty.Union[BenchConfig, DictConfig]):
     run(cfg)
 
 
@@ -55,7 +55,7 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     logger.info(f"Benchmark finished, outputs in: {output_dir}")
 
 
-if __name__ == "__main__":
+def _fix_config_path():
     # NOTE: this is a workaround to allow specifying config file with full path
     #       since hydra only allows config name and config dir
     #       so for -cn /path/to/config.yaml we add -cd /path/to and change -cn to config.yaml
@@ -68,5 +68,16 @@ if __name__ == "__main__":
                 sys.argv.append("-cd")
                 sys.argv.append(os.path.dirname(config_name))
                 sys.argv[cfg_index] = os.path.basename(config_name)
+                logger.debug("Sys argv: " + str(sys.argv))
+                logger.debug(
+                    f"Adjusted config path, using -cd {os.path.dirname(config_name)} and -cn {os.path.basename(config_name)}"
+                )
 
+
+def nvbenjo():
+    _fix_config_path()
+    _run_nvbenjo()
+
+
+if __name__ == "__main__":
     nvbenjo()
