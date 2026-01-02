@@ -25,7 +25,7 @@ extensions = [
     "sphinx.ext.viewcode",  # Add links to source code
     "sphinx.ext.intersphinx",  # Link to other projects' documentation
     "myst_parser",
-    # "sphinx_autodoc_typehints",  # better dataclass support
+    "sphinx_copybutton",
 ]
 source_suffix = {
     ".rst": "restructuredtext",

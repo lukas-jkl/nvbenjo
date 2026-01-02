@@ -10,6 +10,7 @@ It supports models in [Onnx](https://onnx.ai/) format as well as [PyTorch](https
 self
 configuration
 python_api
+examples
 ```
 
 (usage)=
@@ -42,7 +43,6 @@ nvbenjo -cn="/my/config/path/myconfig.yaml" nvbenjo.models.mymodel.num_batches=1
 ```{eval-rst}
 .. literalinclude:: ../src/nvbenjo/conf/example.yaml
    :language: yaml
-   :lines: 1-43
    :caption: Example Configuration
 ```
 

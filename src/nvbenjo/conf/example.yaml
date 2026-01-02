@@ -14,6 +14,7 @@ nvbenjo:
       num_batches: 2
       # You may specify multiple batch sizes to benchmark
       batch_sizes: [1, 2]
+      # You may also specify multiple devices to benchmark
       devices: ["cuda:0"]
       # Specify different runtime options to benchmark with different precisions or settings
       # You may also use `amp`, `amp_fp16`, `amp_bfloat16` for automatic mixed precision
