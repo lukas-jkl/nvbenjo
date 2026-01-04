@@ -1,6 +1,7 @@
 # Configuration
 
-Nvbenjo uses [Hydra](https://hydra.cc/) for configuration using the dataclasses listed below. 
+Nvbenjo uses [Hydra](https://hydra.cc/) for configuration using the dataclasses listed below which you may use with the [Python API](python_api.md). 
+See [Examples](examples.md) for configuration file examples to use with the command line interface.
 
 ## Main configuration classes
 

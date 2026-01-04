@@ -42,6 +42,8 @@ nvbenjo -cn="/my/config/path/myconfig.yaml" nvbenjo.models.mymodel.num_batches=1
 nvbenjo -cn="/my/config/path/myconfig.yaml" --help
 ```
 
+Take a look at the [Documentation](https://nvbenjo.readthedocs.io) for more information as well as example configurations.
+
 ## Development
 
 Example using uv:

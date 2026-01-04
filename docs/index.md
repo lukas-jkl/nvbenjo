@@ -61,6 +61,8 @@ nvbenjo -cn="/my/config/path/myconfig.yaml" nvbenjo.models.mymodel.num_batches=1
    :caption: Example Configuration
 ```
 
+See [Examples](examples.md) for more configuration file examples.
+
 ### Usage with Python API
 
 See the [Python API Reference](python_api.md) for detailed documentation of all available functions and classes and [Configuration Reference](configuration.md) for config objects.
