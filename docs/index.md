@@ -13,6 +13,21 @@ python_api
 examples
 ```
 
+(installing)=
+## Installing
+
+```bash
+pip install nvbenjo
+```
+
+If you need a specific version of PyTorch or want to benchmark Onnx models adapt your install:
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+pip install onnx onnxruntime-gpu
+pip install nvbenjo
+```
+
 (usage)=
 ## Usage
 Nvbenjo can be used as command line tool and uses [hydra](https://hydra.cc/) configuration. 
