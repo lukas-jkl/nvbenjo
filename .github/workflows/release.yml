@@ -1,0 +1,30 @@
+name: release
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      
+      - name: Install the project with onnx
+        run: uv sync --extra onnx-cpu --dev
+
+      - name: Build
+        run: |
+          # This strips the 'v' from the tag (e.g., v1.0.0 -> 1.0.0)
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          export SETUPTOOLS_SCM_PRETEND_VERSION="${TAG_NAME#v}"
+          uv build
+
+      - name: Publish package
+        run: uv publish

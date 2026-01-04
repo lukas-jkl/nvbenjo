@@ -1,0 +1,22 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+      bert:
+        type_or_path: huggingface:google-bert/bert-base-cased
+        kwargs: {}
+        shape: [{"name": "input_ids", "shape": [B, 200], "type": "long", min_max: [0, 200]}]
+        num_warmup_batches: 1
+        num_batches: 2
+        batch_sizes: [1, 8]
+        devices: ["cuda:0"]
+        runtime_options:
+          FP32:
+            precision: FP32
+            enable_profiling: true
+          AMP_FP16:
+            precision: AMP_FP16
+          AMP_BFLOAT16:
+            precision: AMP_BFLOAT16

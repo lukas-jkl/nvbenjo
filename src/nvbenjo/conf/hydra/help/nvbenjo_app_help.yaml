@@ -1,0 +1,37 @@
+app_name: Nvbenjo
+
+header: |
+  == Nvbenjo ==
+  Nvbenjo is a utility for benchmarking deep learning models on NVIDIA GPUs.
+  Usage: nvbenjo -cn <config_path> [overrides]
+
+  Example Usage:
+  - nvbenjo -cn /my/config/path/myconfig.yaml
+  - nvbenjo -cn /my/config/path/myconfig.yaml nvbenjo.models.mymodel.num_batches=10
+
+
+footer: |
+  == Example Configuration ==
+  
+  nvbenjo:
+    measure_memory: true
+    models:
+      resnet50:
+        name: resnet50
+        type_or_path: torchvision:resnet50
+        shape: [B, 3, 224, 224]
+        batch_sizes: [16, 32]
+        devices: [cpu, cuda]
+        runtime_options:
+          fp32:
+            precision: fp32
+          fp16:
+            precision: fp16
+  
+  For more examples, see: nvbenjo/conf/
+
+template: |-
+  ${hydra.help.header}
+  == Current Config ==
+  $CONFIG
+  ${hydra.help.footer}

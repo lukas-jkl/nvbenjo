@@ -1,0 +1,50 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+      resnet50:
+        type_or_path: torchvision:resnet50
+        shape: [B, 3, 224, 224]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        runtime_options:
+          FP32:
+            precision: FP32
+          AMP_FP16:
+            precision: AMP_FP16
+          AMP_BFLOAT16:
+            precision: AMP_BFLOAT16
+
+      vit-base-patch16-224:
+        type_or_path: torchvision:vit_b_16
+        shape: [B, 3, 224, 224]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        runtime_options:
+          FP32:
+            precision: FP32
+          AMP_FP16:
+            precision: AMP_FP16
+          AMP_BFLOAT16:
+            precision: AMP_BFLOAT16
+
+      alexnet:
+        type_or_path: torchvision:alexnet
+        shape: [B, 3, 224, 224]
+        num_warmup_batches: 5
+        num_batches: 10
+        batch_sizes: [1, 8, 16]
+        devices: ["cuda:0"]
+        runtime_options:
+          FP32:
+            precision: FP32
+          AMP_FP16:
+            precision: AMP_FP16
+          AMP_BFLOAT16:
+            precision: AMP_BFLOAT16

@@ -1,0 +1,30 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+      silero:
+        # see https://github.com/snakers4/silero-models/blob/master/models.yml
+        # wget https://models.silero.ai/models/en/en_v5.onnx -O ~/Downloads/silero_model_stt_v5.onnx
+        type_or_path: ~/Downloads/silero_model_stt_v5.onnx
+        shape:
+          - {name: "input", shape: [B, 512], "type": "float", min_max: [0, 1]}
+        num_warmup_batches: 5
+        num_batches: 20
+        batch_sizes: [1, 8, 16, 128]
+
+        # Specify the execution providers to use directly
+        runtime_options:
+          DEFAULT_CPU:
+            execution_providers: ["CPUExecutionProvider"]
+            intra_op_num_threads: 4
+            graph_optimization_level: ORT_ENABLE_EXTENDED
+            enable_profiling: true
+            profiling_prefix: "silero_profile/silero"
+          DEFAULT_CUDA:
+            execution_providers: [["CUDAExecutionProvider", {"device_id": 0}], "CPUExecutionProvider"]
+            intra_op_num_threads: 4
+            graph_optimization_level: ORT_ENABLE_EXTENDED
+            enable_profiling: true
+            profiling_prefix: "silero_profile/silero_cuda"

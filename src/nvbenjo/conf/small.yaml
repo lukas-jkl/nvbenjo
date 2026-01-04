@@ -1,0 +1,21 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+      shufflenet:
+        type_or_path: torchvision:shufflenet_v2_x0_5
+        kwargs: {}
+        shape: [B, 3, 224, 224]
+        num_warmup_batches: 1
+        num_batches: 2
+        batch_sizes: [8, 16]
+        devices: ["cpu"]
+        runtime_options:
+          run_FP32:
+            precision: FP32
+          run_FP16:
+            precision: FP16
+        custom_batchmetrics:
+          fps: 1.0

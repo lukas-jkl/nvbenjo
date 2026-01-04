@@ -1,0 +1,12 @@
+defaults:
+  - base_config
+  - _self_
+  - hydra/help/nvbenjo_app_help
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+output_dir: ./outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+hydra:
+  run:
+    dir: ${output_dir}

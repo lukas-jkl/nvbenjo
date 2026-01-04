@@ -1,0 +1,6 @@
+defaults:
+  - base_config
+  - _self_
+
+nvbenjo:
+  measure_memory: true

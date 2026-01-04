@@ -1,0 +1,12 @@
+defaults:
+  - base_config
+  - _self_ 
+
+nvbenjo:
+  models:
+    dummytorchmodel:
+      type_or_path: replaceme
+      shape: [[B, 10], [B, 20]]
+      batch_sizes: [1, 2]
+      devices: ["cpu"]
+

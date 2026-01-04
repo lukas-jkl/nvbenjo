@@ -1,0 +1,20 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+    resnet:
+      # wget https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/resnet/model/resnet50-v2-7.onnx?download= ~/Downloads/resnet50-v2-7.onnx
+      type_or_path: ~/Downloads/resnet50-v2-7.onnx
+      shape: [{"name": "data", "shape": [B, 3, 224, 224], "type": "float", "min_max": [0, 1]}]
+      num_warmup_batches: 3
+      num_batches: 10
+      batch_sizes: [1, 8, 16, 32]
+      devices: ["cuda:0", "cpu"]
+      runtime_options:
+        DEFAULT:
+          intra_op_num_threads: 2
+          graph_optimization_level: ORT_ENABLE_BASIC
+          enable_profiling: true
+          profiling_prefix: "resnet_profile"

@@ -1,0 +1,67 @@
+[project]
+name = "nvbenjo"
+dynamic = ["version"]
+authors = [{"name" = "lukas_jkl"}]
+description = "Nvbenjo is a utility for benchmarking inference of deep learning models on NVIDIA GPUs."
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+  "torchvision",
+  "torchaudio",
+  "nvitop",
+  "psutil",
+  "py-cpuinfo",
+  "hydra-core",
+  "hydra_colorlog",
+  "nvidia-ml-py",
+  "pandas",
+  "seaborn",
+  "rich"
+]
+[project.scripts]
+nvbenjo = "nvbenjo.cli:nvbenjo"
+#[project.optional-dependencies]
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "ipython",
+    "ty",
+    "nox",
+    "onnxscript",
+    "sphinx",
+    "myst-parser",
+    "pydata-sphinx-theme",
+    "sphinx-copybutton",
+]
+[project.optional-dependencies]
+onnx-cpu = [
+    "onnx>=1.14.0",
+    "onnxruntime>=1.15.0",
+]
+onnx-gpu = [
+    "onnx>=1.14.0",
+    "onnxruntime-gpu>=1.15.0",
+]
+
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools_scm]
+[tool.setuptools]
+include-package-data = true
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.setuptools.package-data]
+nvbenjo = ["conf/*.yml", "conf/*.yaml"]
+
+[tool.ty.src]
+include = [
+    "src",
+]
+
+[tool.ruff]
+line-length = 120
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"

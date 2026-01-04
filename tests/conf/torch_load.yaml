@@ -1,0 +1,15 @@
+defaults:
+  - base_config
+  - _self_ 
+
+nvbenjo:
+  measure_memory: true
+  models:
+    dummytorchmodel:
+      type_or_path: replaceme
+      kwargs: {}
+      shape: [B, 10]
+      num_warmup_batches: 1
+      num_batches: 2
+      batch_sizes: [1, 2]
+      devices: ["cpu"]
