@@ -154,7 +154,7 @@ class OnnxRuntimeConfig:
     )
     intra_op_num_threads: int = 1
     inter_op_num_threads: int = 0
-    log_severity_level: int = 2  # Warning
+    log_severity_level: int = 3  # Error
     enable_profiling: bool = False
     profiling_prefix: ty.Optional[str] = None
     provider_options: ty.Sequence[dict[ty.Any, ty.Any]] | None = None
