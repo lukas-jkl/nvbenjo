@@ -438,4 +438,7 @@ def benchmark_model(
         finally:
             progress_bar.advance(bench_task)
 
+    if progress_bar is not None:
+        progress_bar.remove_task(bench_task)
+
     return pd.concat(results)
