@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath("../src"))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Nvbenjo"
-copyright = "2025, lukas-jkl"
+copyright = "2026, lukas-jkl"
 author = "lukas-jkl"
 
 # -- General configuration ---------------------------------------------------

@@ -29,11 +29,15 @@ nvbenjo:
           compile: false
           compile_kwargs: {dynamic: true}
           enable_profiling: true
+          profiler_kwargs: {}
           profiling_prefix: "whisper_small_profile/whisper_small"
+      
+      custom_batchmetrics:
+        # Define a custom metric that computes Real Time Factor (RTF)
+        # 30s audio input -> 30 / time_total_batch_normalized
+        real_time_factor: 30
 
     silero:
-      # see https://github.com/snakers4/silero-models/blob/master/models.yml
-      # wget https://models.silero.ai/models/en/en_v5.onnx -O ~/Downloads/silero_model_stt_v5.onnx
       type_or_path: ~/Downloads/silero_model_stt_v5.onnx
       shape:
         - {name: "input", shape: [B, 512], "type": "float", min_max: [0, 1]}

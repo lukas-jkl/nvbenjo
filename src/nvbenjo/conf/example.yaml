@@ -4,7 +4,6 @@ defaults:
 
 nvbenjo:
   models:
-    # Specify a PyTorch model
     shufflenet_torch:
       # Directly uses a model part of torchvision but you may also specify a local path or a Hugging Face model identifier
       type_or_path: torchvision:shufflenet_v2_x0_5
@@ -25,15 +24,18 @@ nvbenjo:
           precision: FP32
         run_FP16:
           precision: fp16
-      
+        run_FP32_profiled:
+          precision: FP32
+          enable_profiling: true
+          profiling_prefix: "shufflenet_profile/shufflenet"
+
       custom_batchmetrics:
-      # Define a custom metric that computes frames per second (fps) 
-      # `1 / time_total_batch_normalized`
+        # Define a custom metric that computes frames per second (fps) 
+        # `1 / time_total_batch_normalized`
         fps: 1
 
     # Specify an ONNX model
     resnet_onnx:
-      # wget "https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/resnet/model/resnet50-v2-7.onnx" -O ~/Downloads/resnet50-v2-7.onnx
       type_or_path: ~/Downloads/resnet50-v2-7.onnx
 
       # Input shape can also be specified using a dictionary with input type and min-max values
@@ -45,12 +47,13 @@ nvbenjo:
       devices: ["cuda:0"]
       runtime_options:
         DEFAULT:
+          # onnx runtime session options
           intra_op_num_threads: 2
           graph_optimization_level: ORT_ENABLE_BASIC
           enable_profiling: true
           profiling_prefix: "resnet_profile"
 
       custom_batchmetrics:
-      # Define a custom metric that computes frames per second (fps) 
-      # `1 / time_total_batch_normalized`
+        # Define a custom metric that computes frames per second (fps) 
+        # `1 / time_total_batch_normalized`
         fps: 1

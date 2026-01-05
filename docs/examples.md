@@ -1,5 +1,12 @@
 # Examples
 
+```{eval-rst}
+.. literalinclude:: ../src/nvbenjo/conf/small.yaml
+   :language: yaml
+   :caption: Small Example Configuration for single model
+```
+
+### Example with Profiling
 
 ```{eval-rst}
 .. literalinclude:: ../src/nvbenjo/conf/example.yaml
@@ -38,4 +45,12 @@
 .. literalinclude:: ../src/nvbenjo/conf/huggingface.yaml
    :language: yaml
    :caption: Example Configuration of Huggingface Models
+```
+
+## Advanced Examples
+
+```{eval-rst}
+.. literalinclude:: ../src/nvbenjo/conf/complex_example.yaml
+   :language: yaml
+   :caption: Example Configuration
 ```
