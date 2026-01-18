@@ -56,18 +56,14 @@ intersphinx_mapping = {
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = "pydata_sphinx_theme"
+html_theme = "shibuya"
 html_static_path = ["_static"]
 
-# PyData theme options
+# Shibuya theme options
 html_theme_options = {
     "github_url": "https://github.com/lukas-jkl/nvbenjo",
-    "show_nav_level": 2,
-    "navigation_depth": 3,
-    "show_toc_level": 2,
+    "accent_color": "indigo",
 }
-# Remove left sidebar (don't need it for now)
-html_sidebars = {"**": []}
 html_show_sourcelink = False
 html_copy_source = False
 

@@ -6,7 +6,7 @@
    :caption: Small Example Configuration for single model
 ```
 
-### Example with Profiling
+## Example with Profiling
 
 ```{eval-rst}
 .. literalinclude:: ../src/nvbenjo/conf/example.yaml
