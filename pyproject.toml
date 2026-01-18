@@ -34,6 +34,7 @@ dev = [
     "myst-parser",
     "pydata-sphinx-theme",
     "sphinx-copybutton",
+    "shibuya>=2026.1.9",
 ]
 [project.optional-dependencies]
 onnx-cpu = [
