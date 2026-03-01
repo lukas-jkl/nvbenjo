@@ -21,7 +21,7 @@ cs = ConfigStore.instance()
 cs.store(name="base_config", node=BenchConfig)
 
 
-@hydra.main(version_base=None, config_path=os.path.join(files("nvbenjo").joinpath("conf")), config_name="default")
+@hydra.main(version_base=None, config_path=os.path.join(str(files("nvbenjo").joinpath("conf"))), config_name="default")
 def _run_nvbenjo(cfg: ty.Union[BenchConfig, DictConfig]):
     run(cfg)
 
@@ -72,7 +72,7 @@ def _fix_config_path():
     #       since hydra only allows config name and config dir
     #       so for -cn /path/to/config.yaml we add -cd /path/to and change -cn to config.yaml
     if "-cn" in sys.argv or "--config-name" in sys.argv and "-cd" not in sys.argv and "--config-dir" not in sys.argv:
-        arg_index = sys.argv.index("-cn") if "-cn" in sys.argv else sys.argv.index("--config-name")  # type: ignore
+        arg_index = sys.argv.index("-cn") if "-cn" in sys.argv else sys.argv.index("--config-name")
         cfg_index = arg_index + 1
         if cfg_index <= len(sys.argv) - 1:
             config_name = sys.argv[cfg_index]
