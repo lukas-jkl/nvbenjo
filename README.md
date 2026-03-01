@@ -55,7 +55,7 @@ Take a look at the [Documentation](https://nvbenjo.readthedocs.io) for more info
 Example using uv:
 
 ```bash
-uv sync --extra dev --extra onnx-cpu # or gpu
+uv sync --group dev --extra onnx-cpu # or gpu
 uv run nvbenjo
 
 # for a quick run

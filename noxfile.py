@@ -6,7 +6,7 @@ import requests
 @nox.session(name="lint", venv_backend="uv")
 @nox.parametrize("python", ["3.10"])
 def test_lint(session):
-    session.install("-e", ".[dev,onnx-cpu]")
+    session.install("-e", ".[onnx-cpu]", "--group", "dev")
     session.run("ruff", "check", ".")
     session.run("ruff", "format", "--check", ".")
     session.run("ty", "check", ".")
@@ -17,7 +17,7 @@ def test_lint(session):
 @nox.parametrize("torch", ["2.8.0"])
 def test_python(session, torch):
     session.install(f"torch=={torch}")
-    session.install("-e", ".[dev,onnx-cpu]")
+    session.install("-e", ".[onnx-cpu]", "--group", "dev")
     session.run("pytest")
 
 
@@ -26,7 +26,7 @@ def test_python(session, torch):
 @nox.parametrize("torch", ["2.4", "2.6", "2.8.0"])
 def test_torch(session, torch):
     session.install(f"torch=={torch}")
-    session.install("-e", ".[dev,onnx-cpu]")
+    session.install("-e", ".[onnx-cpu]", "--group", "dev")
     session.run("pytest")
 
 
@@ -36,7 +36,7 @@ def test_torch(session, torch):
 def test_examples(session, torch):
     session.install(f"torch=={torch}")
     session.install("transformers>=4.0.0")
-    session.install("-e", ".[dev,onnx-gpu]")
+    session.install("-e", ".[onnx-gpu]", "--group", "dev")
     files_to_download = [
         ("https://models.silero.ai/models/en/en_v5.onnx", "~/Downloads/silero_model_stt_v5.onnx"),
         (
