@@ -312,6 +312,9 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
         if isinstance(model, (OnnxModelConfig, TorchModelConfig)):
             for runtime_name, runtime in model.runtime_options.items():
                 if runtime.enable_profiling:
+                    if cfg.output_dir is None:
+                        raise ValueError("output_dir must be set when profiling is enabled.")
+
                     if runtime.profiling_prefix is None:
                         runtime.profiling_prefix = os.path.join(
                             cfg.output_dir, model_name, f"{model_name}_{runtime_name}_profile"

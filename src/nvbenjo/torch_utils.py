@@ -99,11 +99,11 @@ def get_model(
 
 def run_model_with_input(model: nn.Module, input: TensorLike) -> TensorLike:
     if isinstance(input, (list, tuple)):
-        return model(*input)  # type: ignore
+        return model(*input)
     elif isinstance(input, dict):
-        return model(**input)  # type: ignore
+        return model(**{str(k): v for k, v in input.items()})
     else:
-        return model(input)  # type: ignore
+        return model(input)
 
 
 def transfer_to_device(result: ty.Any, to_device: torch.device) -> ty.Any:

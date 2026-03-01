@@ -7,7 +7,7 @@ import typing as ty
 from .cfg import OnnxRuntimeConfig
 
 try:
-    import onnxruntime as ort  # type: ignore
+    import onnxruntime as ort
 except ImportError:
     raise ImportError("onnxruntime is not installed. Please install onnx and onnxruntime or onnxruntime-gpu.")
 

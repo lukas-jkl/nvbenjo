@@ -223,11 +223,11 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
                             provider in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]
                             or provider is not None
                             and provider[0] in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]
-                            for provider in runtime_config.execution_providers  # type: ignore
+                            for provider in runtime_config.execution_providers
                         )
                     ):
                         device_id = 0
-                        for provider in runtime_config.execution_providers:  # type: ignore
+                        for provider in runtime_config.execution_providers:
                             if len(provider) == 2 and provider[0] in [
                                 "CUDAExecutionProvider",
                                 "TensorrtExecutionProvider",
@@ -342,7 +342,7 @@ def benchmark_model(
                                 torch_utils.apply_batch_precision(
                                     ty.cast(torch.Tensor, v), precision=runtime_cfg.precision
                                 )
-                                if not set_dtype[k]
+                                if not set_dtype[str(k)]
                                 else ty.cast(torch.Tensor, v)
                             )
                             for k, v in batch.items()
