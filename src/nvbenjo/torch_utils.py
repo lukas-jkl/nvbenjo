@@ -28,7 +28,12 @@ def get_model(
     type_or_path : str
         Model type or path. This can be:
 
+        If no prefix is provided:
         - a valid path to a saved torch model (saved with torch.save or torch.jit.save)
+        If a prefix is provided as `<prefix>:<path>`
+        - a JIT model (named 'jit:<path>')
+        - a torch.export model (named 'torchexport:<path>')
+        - an AOT-compiled model (named 'aot:<path>')
         - a valid huggingface AutoModel (named 'huggingface:<model-name>') see https://huggingface.co/docs/transformers/model_doc/auto
         - a valid torchvision model (named 'torchvision:<model-name>') see `torchvision.models.list_models()`
 
@@ -48,11 +53,32 @@ def get_model(
     --------
     >>> model = get_model("torchvision:resnet18", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig())
     >>> model = get_model("/path/to/model.pth", device=torch.device("cuda"), runtime_config=TorchRuntimeConfig())
-    >>> model = get_model("/path/to/jitmodel.jit", device=torch.device("cuda"), runtime_config=TorchRuntimeConfig())
+    >>> model = get_model("jit:/path/to/model.pt", device=torch.device("cuda"), runtime_config=TorchRuntimeConfig())
+    >>> model = get_model("torchexport:/path/to/model.pt2", device=torch.device("cuda"), runtime_config=TorchRuntimeConfig())
+    >>> model = get_model("aot:/path/to/model.pt2", device=torch.device("cuda"), runtime_config=TorchRuntimeConfig())
     >>> model = get_model("huggingface:bert-base-uncased", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig())
     """
     type_or_path = os.path.expanduser(type_or_path)
-    if os.path.isfile(type_or_path):
+    if type_or_path.startswith("jit:"):
+        if verbose and console is not None:
+            console.print(f"Loading jit model {type_or_path}")
+        type_or_path = type_or_path[len("jit:") :]
+        return torch.jit.load(type_or_path, map_location=device)
+    elif type_or_path.startswith("torchexport:"):
+        if verbose and console is not None:
+            console.print(f"Loading torchexport model {type_or_path}")
+        type_or_path = type_or_path[len("torchexport:") :]
+        program = torch.export.load(type_or_path)
+        module = program.module()
+        module = module.to(device)
+        return module
+    elif type_or_path.startswith("aot:"):
+        if verbose and console is not None:
+            console.print(f"Loading AOT model {type_or_path}")
+        type_or_path = type_or_path[len("aot:") :]
+        return torch._inductor.aoti_load_package(type_or_path)
+    elif os.path.isfile(type_or_path):
+        # Path and no prefix -> try different methods
         if verbose and console is not None:
             console.print(f"Loading torch model {type_or_path}")
         try:
@@ -64,10 +90,13 @@ def get_model(
                 return torch.jit.load(type_or_path, map_location=device)
             except Exception:
                 if torch.__version__ > "2.1":
-                    program = torch.export.load(type_or_path)
-                    module = program.module()
-                    module = module.to(device)
-                    return module
+                    try:
+                        program = torch.export.load(type_or_path)
+                        module = program.module()
+                        module = module.to(device)
+                        return module
+                    except Exception:
+                        return torch._inductor.aoti_load_package(type_or_path)
                 else:
                     raise
 
@@ -91,6 +120,7 @@ def get_model(
             (
                 f"Invalid model {type_or_path}. Must be: \n"
                 "- a valid path \n"
+                "- a valid <prefix>:<path> combination"
                 "- a valid huggingface AutoModel (named 'huggingface:<model-name>')  \n"
                 f"- a valid torchvision model (named 'torchvision:<model-name>') from {available_torchvision_models} \n"
             )
