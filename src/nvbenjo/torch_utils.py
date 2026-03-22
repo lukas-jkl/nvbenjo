@@ -305,10 +305,6 @@ def measure_repeated_inference_timing(
         )
 
     """
-    time_cpu_to_device = []
-    time_inference = []
-    time_device_to_cpu = []
-    time_total = []
     results_raw = []
 
     for _ in range(num_runs):
@@ -341,10 +337,6 @@ def measure_repeated_inference_timing(
 
         assert elapsed_on_device > 0
 
-        time_cpu_to_device.append(start_on_device - start_on_cpu)
-        time_inference.append(elapsed_on_device)
-        time_device_to_cpu.append(stop_on_cpu - stop_on_device)
-        time_total.append(stop_on_cpu - start_on_cpu)
         results_raw.append(
             {
                 "time_cpu_to_device": start_on_device - start_on_cpu,
