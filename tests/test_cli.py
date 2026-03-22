@@ -182,21 +182,24 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
         return self.fc1(x) * self.fc2(y)
 
 
-@pytest.mark.parametrize("export_type", ["torchexport", "torchsave", "torchscript"])
+@pytest.mark.parametrize("export_type", ["aot", "torchexport", "torchsave", "torchscript"])
 def test_torch_load_complex_multiinput(export_type):
     if export_type == "torchexport" and torch.__version__ < "2.1":
         pytest.skip("torch.export is only available in PyTorch 2.1 and later")
+    if export_type == "aot" and torch.__version__ < "2.6":
+        pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
 
     min = 12
     max = 34
     model = ComplexDummyModelMultiInput(min=min, max=max)
 
     with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
+        suffix = ".pt2" if export_type in ["aot"] else ".pt"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmpfile:
             if export_type == "torchsave":
                 torch.save(model, tmpfile)
-            elif export_type == "torchexport":
-                # for tochexport we need a model with simplified control flow
+            elif export_type in ("torchexport", "aot"):
+                # torchexport/aot need a model with simplified control flow
                 model = DummyModelMultiInput()
                 batch_size_dim = torch.export.Dim("B", min=1, max=1024)
                 program = torch.export.export(
@@ -204,8 +207,16 @@ def test_torch_load_complex_multiinput(export_type):
                     args=(torch.randn(2, 10), torch.randn(2, 20)),
                     dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
                 )
-                torch.export.save(program, tmpfile.name)
-                torch.export.load(tmpfile.name)  # verify it can be loaded
+                if export_type == "torchexport":
+                    torch.export.save(program, tmpfile.name)
+                    torch.export.load(tmpfile.name)  # verify it can be loaded
+                elif export_type == "aot":
+                    torch._inductor.aoti_compile_and_package(
+                        program,
+                        package_path=tmpfile.name,
+                    )
+                else:
+                    raise ValueError("Invalid export type")
             elif export_type == "torchscript":
                 m = torch.jit.script(model)
                 torch.jit.save(m, tmpfile)
@@ -238,12 +249,18 @@ def test_torch_load_complex_multiinput(export_type):
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("AMP_FP16", None)
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("FP16", None)
 
-                if export_type == "torchexport":
-                    # torchexport does not work with named inputs
+                if export_type in ("torchexport", "aot"):
+                    # torchexport/aot does not work with named inputs
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["shape"] = [
                         ["B", 10],
                         ["B", 20],
                     ]
+                if export_type == "aot":
+                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["type_or_path"] = f"aot:{tmpfile.name}"
+                    # AOT models are locked to their compiled precision
+                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"] = {
+                        "FP32": {"precision": "FP32", "compile": False},
+                    }
                 cfg = compose(
                     config_name="default",
                     overrides=[
