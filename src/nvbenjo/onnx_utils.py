@@ -283,6 +283,7 @@ def measure_repeated_inference_timing(
 
         if isinstance(device_sample, dict):
             for i, (name, input) in enumerate(device_sample.items()):
+                assert isinstance(input, torch.Tensor)
                 io_binding.bind_input(
                     name=name,
                     device_type=model_device.type,
