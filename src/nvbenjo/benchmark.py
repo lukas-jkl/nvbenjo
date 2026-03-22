@@ -133,7 +133,7 @@ def _get_progress_bar() -> Progress:
 
 
 def _run_warmup(
-    model: nn.Module,
+    model: nn.Module | Callable,
     batch: utils.TensorLike,
     device: torch.device,
     num_warmup_batches: int,
@@ -318,16 +318,16 @@ def benchmark_model(
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 
                 if num_model_parameters is None:
-                    num_model_parameters = torch_utils.get_model_parameters(model)
+                    if isinstance(model, nn.Module):
+                        num_model_parameters = torch_utils.get_model_parameters(model)
+                    else:
+                        num_model_parameters = 0
 
                 model = torch_utils.apply_non_amp_model_precision(
                     model, precision=model_cfg.runtime_options[runtime_option_name].precision
                 )
                 if runtime_cfg.compile:
                     model = torch.compile(model, **runtime_cfg.compile_kwargs)
-
-                if not isinstance(model, nn.Module):
-                    raise ValueError(f"Expected a torch.nn.Module but got {type(model)}")
 
                 # only apply precision to input if no precision is specified
                 if not set_dtype:

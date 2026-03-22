@@ -127,7 +127,7 @@ def get_model(
         )
 
 
-def run_model_with_input(model: nn.Module, input: TensorLike) -> TensorLike:
+def run_model_with_input(model: nn.Module | Callable, input: TensorLike) -> TensorLike:
     if isinstance(input, (list, tuple)):
         return model(*input)
     elif isinstance(input, dict):
@@ -210,12 +210,14 @@ def get_model_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch.device, iterations: int = 3) -> int:
+def measure_memory_allocation(
+    model: nn.Module | Callable, batch: TensorLike, device: torch.device, iterations: int = 3
+) -> int:
     """Measure the peak memory usage during inference
 
     Parameters
     ----------
-    model : nn.Module
+    model : nn.Module | Callable
         The model to benchmark.
     batch : TensorLike
         Sample input to the model.
@@ -234,7 +236,8 @@ def measure_memory_allocation(model: nn.Module, batch: TensorLike, device: torch
     # before_run_allocation = torch.cuda.memory_allocated(device=device)
 
     batch = transfer_to_device(batch, to_device=device)
-    model = model.to(device)
+    if isinstance(model, nn.Module):
+        model = model.to(device)
     for _ in range(iterations):
         r = run_model_with_input(model, batch)
     try:
