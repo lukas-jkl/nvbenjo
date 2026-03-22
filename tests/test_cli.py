@@ -330,6 +330,92 @@ def test_torch_load_complex_invalid_multiinput():
                     raise ValueError("Config is not a DictConfig instance")
 
 
+@pytest.mark.parametrize("compile_mode", ["torch_compile", "aot_compile"])
+def test_torch_compile_modes(compile_mode):
+    if compile_mode == "aot_compile" and torch.__version__ < "2.6":
+        pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
+
+    model = DummyModel()
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
+            torch.save(model, tmpfile)
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                config_override = {
+                    "nvbenjo": {
+                        "models": {
+                            "dummytorchmodel": {
+                                "type_or_path": tmpfile.name,
+                                "num_batches": 2,
+                                "batch_sizes": [1],
+                                "devices": ["cpu"],
+                                "runtime_options": {
+                                    "FP32": {"precision": "FP32", "compile": compile_mode},
+                                },
+                                "shape": ["B", 10],
+                            }
+                        }
+                    }
+                }
+                cfg = compose(
+                    config_name="default",
+                    overrides=[f"output_dir={tmpoutdir}"],
+                )
+                omegaconf.OmegaConf.set_struct(cfg, False)
+                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                omegaconf.OmegaConf.set_struct(cfg, True)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    run_config(cfg)
+                _check_run_files(cfg)
+
+
+@pytest.mark.skipif(torch.__version__ < "2.6", reason="aoti_compile_and_package requires PyTorch 2.6+")
+def test_aot_prefix_loading():
+    model = DummyModelMultiInput()
+    batch_size_dim = torch.export.Dim("B", min=1, max=1024)
+    program = torch.export.export(
+        model,
+        args=(torch.randn(2, 10), torch.randn(2, 20)),
+        dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
+    )
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt2") as tmpfile:
+            torch._inductor.aoti_compile_and_package(
+                program,
+                package_path=tmpfile.name,
+            )
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                config_override = {
+                    "nvbenjo": {
+                        "models": {
+                            "aotmodel": {
+                                "type_or_path": f"aot:{tmpfile.name}",
+                                "num_batches": 2,
+                                "batch_sizes": [1, 2],
+                                "devices": ["cpu"],
+                                "runtime_options": {
+                                    "FP32": {"precision": "FP32", "compile": False},
+                                },
+                                "shape": [["B", 10], ["B", 20]],
+                            }
+                        }
+                    }
+                }
+                cfg = compose(
+                    config_name="default",
+                    overrides=[f"output_dir={tmpoutdir}"],
+                )
+                omegaconf.OmegaConf.set_struct(cfg, False)
+                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                omegaconf.OmegaConf.set_struct(cfg, True)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    run_config(cfg)
+                _check_run_files(cfg)
+
+
 def test_cli_cn_path_arg():
     with initialize(version_base=None, config_path="conf"):
         with tempfile.TemporaryDirectory() as cfg_tmpdir:
