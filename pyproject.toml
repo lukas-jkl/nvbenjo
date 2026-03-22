@@ -24,6 +24,7 @@ nvbenjo = "nvbenjo.cli:nvbenjo"
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-xdist",
     "pytest-cov",
     "ruff",
     "ipython",
