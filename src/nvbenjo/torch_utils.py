@@ -113,7 +113,9 @@ def get_model(
         if type_or_path in available_torchvision_models:
             if verbose and console is not None:
                 console.print(f"Loading torchvision model {type_or_path}")
-            return torchvision.models.get_model(type_or_path, **kwargs).to(device)
+            model = torchvision.models.get_model(type_or_path, **kwargs).to(device)
+            model.eval()
+            return model
     else:
         available_torchvision_models = torchvision.models.list_models()
         raise ValueError(
