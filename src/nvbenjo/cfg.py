@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from .utils import PrecisionType, ProviderType
+from .utils import PrecisionType, ProviderType, CompileMode
 
 
 @dataclass
@@ -100,8 +100,9 @@ class TorchRuntimeConfig:
 
     Parameters
     ----------
-    compile : bool
-        Whether to compile the model using torch.compile (PyTorch 2.0+).
+    compile : str
+        Whether to compile the model using torch.compile (PyTorch 2.0+) or other compile modes.
+        May be True|False or a string specifying the compile type (e.g., "torch_compile", "aot_compile").
     compile_kwargs : dict
         Additional keyword arguments for torch.compile.
     precision : PrecisionType
@@ -114,12 +115,19 @@ class TorchRuntimeConfig:
         Additional keyword arguments for torch.profiler.profile.
     """
 
-    compile: bool = False
+    compile: str = "False"
     compile_kwargs: dict = field(default_factory=dict)
     precision: PrecisionType = PrecisionType.FP32
     enable_profiling: bool = False
     profiling_prefix: ty.Optional[str] = None
     profiler_kwargs: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        # Hydra passes everything as primitives, normalize here
+        if isinstance(self.compile, bool) or str(self.compile).lower() in ("true", "false"):
+            is_true = self.compile is True or str(self.compile).lower() == "true"
+            self.compile = "torch_compile" if is_true else "none"
+        self._compile_mode = CompileMode(self.compile.lower())
 
 
 @dataclass

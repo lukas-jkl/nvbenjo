@@ -323,11 +323,10 @@ def benchmark_model(
                     else:
                         num_model_parameters = 0
 
-                model = torch_utils.apply_non_amp_model_precision(
-                    model, precision=model_cfg.runtime_options[runtime_option_name].precision
-                )
-                if runtime_cfg.compile:
-                    model = torch.compile(model, **runtime_cfg.compile_kwargs)
+                if isinstance(model, nn.Module):
+                    model = torch_utils.apply_non_amp_model_precision(
+                        model, precision=model_cfg.runtime_options[runtime_option_name].precision
+                    )
 
                 # only apply precision to input if no precision is specified
                 if not set_dtype:
@@ -348,6 +347,17 @@ def benchmark_model(
                             for k, v in batch.items()
                         },
                     )
+
+                if runtime_cfg._compile_mode != utils.CompileMode.NONE:
+                    if runtime_cfg._compile_mode == utils.CompileMode.TORCH_COMPILE:
+                        model = torch.compile(model, **runtime_cfg.compile_kwargs)
+                    elif runtime_cfg._compile_mode == utils.CompileMode.AOT_COMPILE:
+                        batch_args = batch if isinstance(batch, tuple) else (batch,)
+                        program = torch.export.export(model, batch_args)
+                        package_path = torch._inductor.aoti_compile_and_package(program, **runtime_cfg.compile_kwargs)
+                        model = torch._inductor.aoti_load_package(package_path)
+                    else:
+                        raise ValueError(f"Unknown compile mode {runtime_cfg._compile_mode}")
 
                 with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
