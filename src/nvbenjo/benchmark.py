@@ -353,7 +353,9 @@ def benchmark_model(
                         model = torch.compile(model, **runtime_cfg.compile_kwargs)
                     elif runtime_cfg._compile_mode == utils.CompileMode.AOT_COMPILE:
                         batch_args = batch if isinstance(batch, tuple) else (batch,)
-                        program = torch.export.export(model, batch_args)
+                        device_args = tuple(torch_utils.transfer_to_device(ba, device) for ba in batch_args)
+                        with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
+                            program = torch.export.export(model.to(device), device_args)
                         package_path = torch._inductor.aoti_compile_and_package(program, **runtime_cfg.compile_kwargs)
                         model = torch._inductor.aoti_load_package(package_path)
                     else:
