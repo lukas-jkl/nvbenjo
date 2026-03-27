@@ -105,7 +105,7 @@ def print_system_info(system_info: dict):
     else:
         content.append("  None\n", style=text_color)
 
-    console.print(Panel(content, title=title, border_style="blue", padding=(1, 4)))
+    console.print(Panel(content, title=title, border_style="blue", padding=(0, 2)))
 
 
 def print_results(results: pd.DataFrame, custom_metric_keys: List[str] = []):
@@ -175,5 +175,5 @@ def print_results(results: pd.DataFrame, custom_metric_keys: List[str] = []):
                 table.add_row(*[str(value) for value in row.values])
 
             # Display the table in a panel
-            console.print(Panel(table, border_style="dim", padding=(1, 2)))
+            console.print(Panel(table, border_style="dim", padding=(0, 1)))
             console.print("\n")
