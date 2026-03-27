@@ -354,8 +354,13 @@ def benchmark_model(
                     elif runtime_cfg._compile_mode == utils.CompileMode.AOT_COMPILE:
                         batch_args = batch if isinstance(batch, tuple) else (batch,)
                         device_args = tuple(torch_utils.transfer_to_device(ba, device) for ba in batch_args)
-                        with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
+                        if torch_utils.AMP_PREFIX in runtime_cfg.precision.value:
+                            raise ValueError("Can't run exported model with AMP precision")
+                        if isinstance(model, nn.Module):
                             program = torch.export.export(model.to(device), device_args)
+                            program = program.run_decompositions()
+                            # program.module().to(device)
+
                         package_path = torch._inductor.aoti_compile_and_package(program, **runtime_cfg.compile_kwargs)
                         model = torch._inductor.aoti_load_package(package_path)
                     else:
