@@ -4,7 +4,7 @@ import requests
 
 
 @nox.session(name="lint", venv_backend="uv")
-@nox.parametrize("python", ["3.10"])
+@nox.parametrize("python", ["3.12"])
 def test_lint(session):
     session.install("-e", ".[onnx-cpu]", "--group", "dev")
     session.run("ruff", "check", ".")
@@ -14,7 +14,7 @@ def test_lint(session):
 
 @nox.session(name="test-python", venv_backend="uv")
 @nox.parametrize("python", ["3.10", "3.11", "3.12", "3.13"])
-@nox.parametrize("torch", ["2.8.0"])
+@nox.parametrize("torch", ["2.10.0"])
 def test_python(session, torch):
     session.install(f"torch=={torch}")
     session.install("-e", ".[onnx-cpu]", "--group", "dev")
@@ -22,8 +22,8 @@ def test_python(session, torch):
 
 
 @nox.session(name="test-torch", venv_backend="uv")
-@nox.parametrize("python", ["3.11"])
-@nox.parametrize("torch", ["2.4", "2.6", "2.8.0"])
+@nox.parametrize("python", ["3.12"])
+@nox.parametrize("torch", ["2.4", "2.6", "2.10.0"])
 def test_torch(session, torch):
     session.install(f"torch=={torch}")
     session.install("-e", ".[onnx-cpu]", "--group", "dev")
@@ -31,8 +31,8 @@ def test_torch(session, torch):
 
 
 @nox.session(name="test-examples", venv_backend="uv", default=False)
-@nox.parametrize("python", ["3.11"])
-@nox.parametrize("torch", ["2.8.0"])
+@nox.parametrize("python", ["3.12"])
+@nox.parametrize("torch", ["2.10.0"])
 def test_examples(session, torch):
     session.install(f"torch=={torch}")
     session.install("transformers>=4.0.0")
