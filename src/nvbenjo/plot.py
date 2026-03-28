@@ -177,9 +177,11 @@ def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, d
 
 
 def _print_summary_plot(results: pd.Series | pd.DataFrame, model: str, device: str, custom_metric_keys: List):
+    default_metric = "time_total_batch_normalized"
+    default_metric_title = "Time Batch Normalized"
     if not custom_metric_keys:
-        first_metric = "time_total_batch_normalized"
-        metric_title = "Time Batch Normalized"
+        first_metric = default_metric
+        metric_title = default_metric_title
     else:
         first_metric = custom_metric_keys[0]
         metric_title = first_metric
@@ -231,7 +233,7 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, model: str, device: s
                     res.device,
                     Bar(begin=0, size=max_first_metric, end=first_val, width=80, color="cyan"),
                     Text(
-                        format_seconds(first_val) if first_metric == "first_metric" else str(format_num(first_val)),
+                        format_seconds(first_val) if first_metric == default_metric else str(format_num(first_val)),
                         style="cyan",
                     ),
                     "   ",
