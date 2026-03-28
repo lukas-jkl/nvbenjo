@@ -7,7 +7,6 @@ import pandas as pd
 from rich import box
 import seaborn as sns
 from rich.bar import Bar
-from rich.console import Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -173,37 +172,17 @@ def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, d
     for _, row in print_result.iterrows():
         table.add_row(*[str(value) for value in row.values])
 
-    table_plots = _print_device_plots(model_results, model, device, custom_metric_keys)
-    table = Group(table, table_plots)
-
     # Display the table in a panel
     console.print(Panel(table, border_style="dim", padding=(0, 1)))
-    console.print("\n")
 
 
-def _print_device_plots(model_results: pd.Series | pd.DataFrame, model: str, device: str, custom_metric_keys: List):
-    # Get grouped results
-    device_results = model_results[model_results.device == device]
-    device_results = device_results.drop(columns=["device"])
-    device_results = device_results.groupby(["model", "runtime_options", "batch_size"]).mean()
-    # device_results["device"] = device  # Add device column back for display
-    print_result = device_results.reset_index()
-
-    # Remove columns where all values are None
-    print_result = print_result.dropna(axis="columns", how="all")
-
-    # Get grouped results
-    device_results = model_results[model_results.device == device]
-
+def _print_summary_plot(results: pd.Series | pd.DataFrame, model: str, device: str, custom_metric_keys: List):
     if not custom_metric_keys:
         first_metric = "time_total_batch_normalized"
         metric_title = "Time Batch Normalized"
     else:
         first_metric = custom_metric_keys[0]
         metric_title = first_metric
-
-    max_first_val = device_results[first_metric].max().item()
-    max_mem = device_results.memory_bytes.max().item()
 
     table = Table(
         show_header=True,
@@ -213,32 +192,60 @@ def _print_device_plots(model_results: pd.Series | pd.DataFrame, model: str, dev
         title_justify="left",
         title_style="bold",
     )
-
-    table.add_column("", style="bold")
+    table.add_column("Model", style="bold")
+    table.add_column("Runtime Options", style="bold")
+    table.add_column("Batch Size", style="bold")
+    table.add_column("Device", style="bold")
     table.add_column(metric_title, header_style="bold cyan")
     table.add_column("", justify="right")
     table.add_column("", justify="right")
     table.add_column("Memory", header_style="bold red")
     table.add_column("", justify="right")
-    device_results = device_results.sort_values(first_metric)
-    for _, res in device_results.iterrows():
-        label = f"{model}-{res.device}-bs{res.batch_size}-{res.runtime_options}"
-        first_val = res[first_metric]
-        mem_val = res.memory_bytes
-        table.add_row(
-            label,
-            Bar(begin=0, size=max_first_val, end=first_val, width=80, color="cyan"),
-            format_seconds(first_val) if first_metric == "first_metric" else format_num(first_val),
-            "   ",
-            Bar(begin=0, size=max_mem, end=mem_val, width=80, color="red"),
-            format_num(mem_val, bytes=True),
-        )
-    return table
+
+    max_first_metric = results[first_metric].max().item()
+    max_mem = results.memory_bytes.max().item()
+    for model in results.model.unique():
+        model_results = results[results.model == model]
+        for device in model_results.device.unique():
+            # Get grouped results and mean over runs
+            device_results = model_results[model_results.device == device]
+            device_results = device_results.drop(columns=["device"])
+            device_results = device_results.groupby(["model", "runtime_options", "batch_size"]).mean()
+            device_results["device"] = device  # Add device column back for display
+            print_result = device_results.reset_index()
+
+            # Remove columns where all values are None
+            print_result = print_result.dropna(axis="columns", how="all")
+
+            # Get grouped results
+            device_results = model_results[model_results.device == device]
+
+            print_result = print_result.sort_values(first_metric)
+            for _, res in print_result.iterrows():
+                first_val = res[first_metric]
+                mem_val = res.memory_bytes
+                table.add_row(
+                    Text(model, style="green"),
+                    Text(res.runtime_options, style="blue"),
+                    Text(str(res.batch_size), style="yellow"),
+                    res.device,
+                    Bar(begin=0, size=max_first_metric, end=first_val, width=80, color="cyan"),
+                    Text(
+                        format_seconds(first_val) if first_metric == "first_metric" else str(format_num(first_val)),
+                        style="cyan",
+                    ),
+                    "   ",
+                    Bar(begin=0, size=max_mem, end=mem_val, width=80, color="red"),
+                    Text(str(format_num(mem_val, bytes=True)), style="red"),
+                )
+
+    console.print(Panel(table, border_style="dim", padding=(0, 1)))
 
 
 def print_results(results: pd.DataFrame, custom_metric_keys: List[str] = []):
-    console.print("\n")
     for model in results.model.unique():
         model_results = results[results.model == model]
         for device in model_results.device.unique():
             _print_device_results(model_results, model, device, custom_metric_keys)
+
+    _print_summary_plot(results, model, device, custom_metric_keys)
