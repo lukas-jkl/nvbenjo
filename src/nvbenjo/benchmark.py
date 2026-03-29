@@ -123,11 +123,18 @@ def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Opt
     return results
 
 
+class _ConditionalCountColumn(progress.ProgressColumn):
+    def render(self, task: progress.Task) -> str:
+        if task.total is None:
+            return ""
+        return f"{int(task.completed)}/{int(task.total)}"
+
+
 def _get_progress_bar() -> Progress:
     return Progress(
         "[progress.description]{task.description}",
-        progress.BarColumn(bar_width=80),
-        "[progress.percentage]{task.completed}/{task.total}",
+        progress.BarColumn(bar_width=80, pulse_style="cyan"),
+        _ConditionalCountColumn(),
         console=console,
     )
 
@@ -376,10 +383,15 @@ def benchmark_model(
                                     batch_args = (device_batch,)
                                 program = torch.export.export(model.to(device), batch_args)
                         else:
-                            program = model
+                            program = model.to(device)
 
                         program = program.run_decompositions()
-                        package_path = torch._inductor.aoti_compile_and_package(program, **runtime_cfg.compile_kwargs)
+                        compile_task = progress_bar.add_task("    AOT compiling...", total=None) if progress_bar else None
+                        try:
+                            package_path = torch._inductor.aoti_compile_and_package(program, **runtime_cfg.compile_kwargs)
+                        finally:
+                            if compile_task is not None:
+                                progress_bar.remove_task(compile_task)
                         model = torch._inductor.aoti_load_package(package_path)
                     else:
                         raise ValueError(f"Unknown compile mode {runtime_cfg._compile_mode}")
