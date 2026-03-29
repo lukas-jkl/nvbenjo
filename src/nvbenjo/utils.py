@@ -84,7 +84,7 @@ def _get_rnd(
         dtype = dtype if dtype is not None else "float32"
         if value:
             if isinstance(value, (ListConfig, list)):
-                rnd = torch.tensor(value, dtype=getattr(torch, dtype))
+                rnd = torch.tensor(value, dtype=getattr(torch, dtype)).expand(shape_tuple)
             else:
                 rnd = torch.full(size=shape_tuple, fill_value=value, dtype=getattr(torch, dtype))
         else:
@@ -92,7 +92,7 @@ def _get_rnd(
     elif any(s in dtype for s in ["int", "long"]):
         if value:
             if isinstance(value, (ListConfig, list)):
-                rnd = torch.tensor(value, dtype=getattr(torch, dtype))
+                rnd = torch.tensor(value, dtype=getattr(torch, dtype)).expand(shape_tuple)
             else:
                 rnd = torch.full(size=shape_tuple, fill_value=value, dtype=getattr(torch, dtype))
         else:

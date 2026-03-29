@@ -199,6 +199,12 @@ def _measure_timings(
 
 
 def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: str, console) -> torch.device:
+    """Get the torch.device to run the model on based on the runtime configuration and desired device.
+
+    For ONNX models with ``device="cpu"``, the device is auto-promoted to CUDA when a CUDA or
+    TensorRT execution provider is requested and available. Falls back to CPU with a console
+    warning when CUDA is requested but unavailable (hardware or onnxruntime provider missing).
+    """
     device_chosen = torch.device(device)
     match device_chosen.type:
         case "cpu":
@@ -221,8 +227,8 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
                         and runtime_config.execution_providers
                         and any(
                             provider in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]
-                            or provider is not None
-                            and provider[0] in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]
+                            or (provider is not None
+                            and provider[0] in ["CUDAExecutionProvider", "TensorrtExecutionProvider"])
                             for provider in runtime_config.execution_providers
                         )
                     ):
@@ -234,6 +240,8 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
                             ]:
                                 device_id = provider[1].get("device_id", 0)  # type: ignore
                         device_chosen = torch.device(f"cuda:{device_id}")
+                case _:
+                    raise ValueError(f"Unknown runtime config type {type(runtime_config)}")
             return device_chosen
         case "cuda":
             match runtime_config:
@@ -265,8 +273,6 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
                     raise ValueError(f"Unknown runtime config type {type(runtime_config)}")
         case _:
             raise ValueError(f"Invalid device {device}. Must be one of cpu or cuda")
-
-    return device_chosen
 
 
 # TODO: !! two seperate functions torch and onnx
