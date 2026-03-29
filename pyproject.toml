@@ -63,6 +63,9 @@ include = [
     "src",
 ]
 
+[tool.coverage.run]
+omit = ["noxfile.py"]
+
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint.pydocstyle]
