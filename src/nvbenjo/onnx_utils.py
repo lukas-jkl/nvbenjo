@@ -47,7 +47,7 @@ def get_model(
 
     if runtime_config.execution_providers is None:
         if device.type == "cuda":
-            if "CUDAExecutionProvider" not in ort.get_available_providers():  # type: ignore
+            if "CUDAExecutionProvider" not in ort.get_available_providers():
                 raise RuntimeError(
                     "CUDAExecutionProvider is not available in onnxruntime. Please install onnxruntime-gpu or run on CPU."
                 )
@@ -65,7 +65,7 @@ def get_model(
         if isinstance(provider, (list, ListConfig)):
             providers[i] = tuple(provider)  # type: ignore
 
-    session_options = ort.SessionOptions()  # type: ignore
+    session_options = ort.SessionOptions()
     session_options.log_severity_level = runtime_config.log_severity_level
     session_options.intra_op_num_threads = runtime_config.intra_op_num_threads
     session_options.inter_op_num_threads = runtime_config.inter_op_num_threads
@@ -73,7 +73,7 @@ def get_model(
     if runtime_config.enable_profiling and runtime_config.profiling_prefix is not None:
         session_options.profile_file_prefix = runtime_config.profiling_prefix
     session_options.graph_optimization_level = getattr(
-        ort.GraphOptimizationLevel,  # type: ignore
+        ort.GraphOptimizationLevel,
         runtime_config.graph_optimization_level,
     )
 

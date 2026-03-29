@@ -222,7 +222,7 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
                     # If CUDA is available and the execution provider is set to CUDA or TensorRT, use CUDA
                     from nvbenjo import onnx_utils
 
-                    available_providers = onnx_utils.ort.get_available_providers()  # type: ignore
+                    available_providers = onnx_utils.ort.get_available_providers()
                     if (
                         torch.cuda.is_available()
                         and (
@@ -264,7 +264,7 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
                 case OnnxRuntimeConfig():
                     from nvbenjo import onnx_utils
 
-                    available_providers = onnx_utils.ort.get_available_providers()  # type: ignore
+                    available_providers = onnx_utils.ort.get_available_providers()
                     if torch.cuda.is_available() and (
                         "CUDAExecutionProvider" in available_providers
                         or "TensorrtExecutionProvider" in available_providers
