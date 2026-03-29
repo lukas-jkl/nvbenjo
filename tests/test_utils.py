@@ -157,9 +157,7 @@ def test_get_device_onnx_cuda_no_cuda_available(mock_cuda):
             cfg = OnnxRuntimeConfig(execution_providers=["CPUExecutionProvider"])
             device = _get_device(cfg, "cuda", mock_console)
             assert device == torch.device("cpu")
-            mock_console.print.assert_called_once_with(
-                "[yellow]CUDA is not available. Running on CPU.[/yellow]"
-            )
+            mock_console.print.assert_called_once_with("[yellow]CUDA is not available. Running on CPU.[/yellow]")
 
 
 def test_get_device_invalid_runtime_config_cpu():

@@ -227,8 +227,10 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
                         and runtime_config.execution_providers
                         and any(
                             provider in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]
-                            or (provider is not None
-                            and provider[0] in ["CUDAExecutionProvider", "TensorrtExecutionProvider"])
+                            or (
+                                provider is not None
+                                and provider[0] in ["CUDAExecutionProvider", "TensorrtExecutionProvider"]
+                            )
                             for provider in runtime_config.execution_providers
                         )
                     ):
