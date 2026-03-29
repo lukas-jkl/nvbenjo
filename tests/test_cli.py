@@ -330,12 +330,27 @@ def test_torch_load_complex_invalid_multiinput():
                     raise ValueError("Config is not a DictConfig instance")
 
 
-@pytest.mark.parametrize("compile_mode", ["torch_compile", "aot_compile"])
-def test_torch_compile_modes(compile_mode):
+@pytest.mark.parametrize("compile_mode", ["aot_compile", "torch_compile"])
+@pytest.mark.parametrize(
+    "model_cls,shape",
+    [
+        (DummyModel, ["B", 10]),
+        (DummyModelMultiInput, [["B", 10], ["B", 20]]),
+        (
+            DummyModelMultiInput,
+            [
+                {"name": "x", "shape": ["B", 10]},
+                {"name": "y", "shape": ["B", 20]},
+            ],
+        ),
+    ],
+    ids=["single", "multi_args", "multi_kwargs"],
+)
+def test_compile_modes(compile_mode, model_cls, shape):
     if compile_mode == "aot_compile" and torch.__version__ < "2.6":
         pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
 
-    model = DummyModel()
+    model = model_cls()
 
     with initialize(version_base=None, config_path="conf"):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
@@ -352,7 +367,7 @@ def test_torch_compile_modes(compile_mode):
                                 "runtime_options": {
                                     "FP32": {"precision": "FP32", "compile": compile_mode},
                                 },
-                                "shape": ["B", 10],
+                                "shape": shape,
                             }
                         }
                     }
