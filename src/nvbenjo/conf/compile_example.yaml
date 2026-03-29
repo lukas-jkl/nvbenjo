@@ -20,7 +20,7 @@ nvbenjo:
         torch_compile:
           precision: AMP_BFLOAT16
           compile: torch_compile
-        # Ahead-of-time compilation
+        # Ahead-of-time compilation (AMP is not supported for AOT)
         aot_compile:
-          precision: AMP_BFLOAT16
+          precision: BFLOAT16
           compile: aot_compile
