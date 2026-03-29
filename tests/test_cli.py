@@ -340,14 +340,7 @@ def test_torch_load_complex_invalid_multiinput():
 
 @pytest.mark.parametrize("compile_mode", ["aot_compile", "torch_compile"])
 @pytest.mark.parametrize("precision", ["FP32", "FP16", "AMP_FP16"])
-@pytest.mark.parametrize(
-    "compile_kwargs",
-    [
-        {},
-        {"dynamic": True},
-    ],
-    ids=["default_kwargs", "dynamic"],
-)
+@pytest.mark.parametrize("extra_compile_kwargs", [False, True], ids=["default_kwargs", "extra_kwargs"])
 @pytest.mark.parametrize(
     "model_cls,shape",
     [
@@ -363,13 +356,21 @@ def test_torch_load_complex_invalid_multiinput():
     ],
     ids=["single", "multi_args", "multi_kwargs"],
 )
-def test_compile_modes(compile_mode, precision, compile_kwargs, model_cls, shape):
+def test_compile_modes(compile_mode, precision, extra_compile_kwargs, model_cls, shape):
     if compile_mode == "aot_compile" and torch.__version__ < "2.6":
         pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
     if precision in ("FP16", "AMP_FP16") and torch.__version__ < "2.2":
         pytest.skip("FP16/AMP_FP16 requires PyTorch 2.2 and later")
     if compile_mode == "aot_compile" and precision == "AMP_FP16":
         pytest.skip("AOT compiled models cannot use AMP precision")
+
+    if extra_compile_kwargs:
+        if compile_mode == "aot_compile":
+            compile_kwargs = {"inductor_configs": {}}
+        else:
+            compile_kwargs = {"dynamic": True}
+    else:
+        compile_kwargs = {}
 
     model = model_cls()
 
