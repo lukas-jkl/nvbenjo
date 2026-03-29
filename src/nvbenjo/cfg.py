@@ -1,3 +1,4 @@
+import logging
 import os
 import typing as ty
 from abc import ABC
@@ -8,6 +9,8 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf, open_dict
 
 from .utils import PrecisionType, ProviderType, CompileMode
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -234,6 +237,19 @@ class TorchModelConfig(BaseModelConfig):
         for i, (key, opt) in enumerate(self.runtime_options.items()):
             if isinstance(opt, DictConfig):
                 self.runtime_options[key] = OmegaConf.structured(TorchRuntimeConfig(**OmegaConf.to_container(opt)))  # type: ignore
+
+        if self.type_or_path.startswith(("aot:", "torchexport:")):
+            precisions = {rt.precision for rt in self.runtime_options.values() if isinstance(rt, TorchRuntimeConfig)}
+            if len(precisions) > 1:
+                raise ValueError(
+                    f"Model '{self.name}' is pre-exported — precision is baked in at export time. "
+                    f"Got multiple different precisions in runtime_options: {precisions}"
+                )
+            compile_modes = {
+                rt._compile_mode for rt in self.runtime_options.values() if isinstance(rt, TorchRuntimeConfig)
+            }
+            if compile_modes - {CompileMode.NONE}:
+                logger.warning(f"Model '{self.name}' is pre-exported — setting compile has no effect.")
 
 
 @dataclass
