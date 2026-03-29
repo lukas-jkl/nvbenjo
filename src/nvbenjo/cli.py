@@ -31,6 +31,8 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
     models = instantiate_model_configs(cfg)
     if cfg.output_dir is not None:
         output_dir = os.path.abspath(cfg.output_dir)
+    else:
+        output_dir = None
 
     system_info = get_system_info()
 
