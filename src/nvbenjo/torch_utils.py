@@ -117,13 +117,13 @@ def get_model(
     else:
         available_torchvision_models = torchvision.models.list_models()
         raise ValueError(
-            (
-                f"Invalid model {type_or_path}. Must be: \n"
-                "- a valid path \n"
-                "- a valid <prefix>:<path> combination\n"
-                "- a valid huggingface AutoModel (named 'huggingface:<model-name>')  \n"
-                f"- a valid torchvision model (named 'torchvision:<model-name>') from {available_torchvision_models} \n"
-            )
+            f"Invalid model {type_or_path}. Must be: \n"
+            "- a valid path to a saved torch model\n"
+            "- 'jit:<path>' for a TorchScript/JIT model\n"
+            "- 'torchexport:<path>' for a torch.export model\n"
+            "- 'aot:<path>' for a pre-compiled AOT model\n"
+            "- 'huggingface:<model-name>' for a HuggingFace AutoModel\n"
+            f"- 'torchvision:<model-name>' from {available_torchvision_models}\n"
         )
 
 
