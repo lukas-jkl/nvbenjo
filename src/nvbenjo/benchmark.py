@@ -352,15 +352,25 @@ def benchmark_model(
                     if runtime_cfg._compile_mode == utils.CompileMode.TORCH_COMPILE:
                         model = torch.compile(model, **runtime_cfg.compile_kwargs)
                     elif runtime_cfg._compile_mode == utils.CompileMode.AOT_COMPILE:
-                        batch_args = batch if isinstance(batch, tuple) else (batch,)
-                        device_args = tuple(torch_utils.transfer_to_device(ba, device) for ba in batch_args)
                         if torch_utils.AMP_PREFIX in runtime_cfg.precision.value:
                             raise ValueError("Can't run exported model with AMP precision")
-                        if isinstance(model, nn.Module):
-                            program = torch.export.export(model.to(device), device_args)
-                            program = program.run_decompositions()
-                            # program.module().to(device)
 
+                        if isinstance(model, nn.Module):
+                            device_batch = torch_utils.transfer_to_device(batch, device)
+                            if isinstance(device_batch, dict):
+                                program = torch.export.export(
+                                    model.to(device), args=(), kwargs=device_batch
+                                )
+                            else:
+                                if isinstance(device_batch, (tuple, list)):
+                                    batch_args = tuple(device_batch)
+                                else:
+                                    batch_args = (device_batch,)
+                                program = torch.export.export(model.to(device), batch_args)
+                        else:
+                            program = model
+
+                        program = program.run_decompositions()
                         package_path = torch._inductor.aoti_compile_and_package(program, **runtime_cfg.compile_kwargs)
                         model = torch._inductor.aoti_load_package(package_path)
                     else:

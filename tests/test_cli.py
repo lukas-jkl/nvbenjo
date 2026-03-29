@@ -183,7 +183,8 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
 
 
 @pytest.mark.parametrize("export_type", ["aot", "torchexport", "torchsave", "torchscript"])
-def test_torch_load_complex_multiinput(export_type):
+@pytest.mark.parametrize("input_style", ["args", "kwargs"])
+def test_torch_load_complex_multiinput(export_type, input_style):
     if export_type == "torchexport" and torch.__version__ < "2.1":
         pytest.skip("torch.export is only available in PyTorch 2.1 and later")
     if export_type == "aot" and torch.__version__ < "2.6":
@@ -191,7 +192,10 @@ def test_torch_load_complex_multiinput(export_type):
 
     min = 12
     max = 34
-    model = ComplexDummyModelMultiInput(min=min, max=max)
+    if input_style == "args":
+        model = DummyModelMultiInput()
+    else:
+        model = ComplexDummyModelMultiInput(min=min, max=max)
 
     with initialize(version_base=None, config_path="conf"):
         suffix = ".pt2" if export_type in ["aot"] else ".pt"
@@ -202,11 +206,19 @@ def test_torch_load_complex_multiinput(export_type):
                 # torchexport/aot need a model with simplified control flow
                 model = DummyModelMultiInput()
                 batch_size_dim = torch.export.Dim("B", min=1, max=1024)
-                program = torch.export.export(
-                    model,
-                    args=(torch.randn(2, 10), torch.randn(2, 20)),
-                    dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
-                )
+                if input_style == "args":
+                    program = torch.export.export(
+                        model,
+                        args=(torch.randn(2, 10), torch.randn(2, 20)),
+                        dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
+                    )
+                else:
+                    program = torch.export.export(
+                        model,
+                        args=(),
+                        kwargs={"x": torch.randn(2, 10), "y": torch.randn(2, 20)},
+                        dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
+                    )
                 if export_type == "torchexport":
                     torch.export.save(program, tmpfile.name)
                     torch.export.load(tmpfile.name)  # verify it can be loaded
@@ -237,7 +249,9 @@ def test_torch_load_complex_multiinput(export_type):
                                     "FP16": {"precision": "FP16", "compile": False},
                                     "AMP_FP16": {"precision": "AMP_FP16", "compile": False},
                                 },
-                                "shape": [
+                                "shape": [["B", 10], ["B", 20]]
+                                if input_style == "args"
+                                else [
                                     {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
                                     {"name": "y", "shape": ["B", 20], "min_max": [min, max]},
                                 ],
@@ -249,12 +263,6 @@ def test_torch_load_complex_multiinput(export_type):
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("AMP_FP16", None)
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("FP16", None)
 
-                if export_type in ("torchexport", "aot"):
-                    # torchexport/aot does not work with named inputs
-                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["shape"] = [
-                        ["B", 10],
-                        ["B", 20],
-                    ]
                 if export_type == "aot":
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["type_or_path"] = f"aot:{tmpfile.name}"
                     # AOT models are locked to their compiled precision
