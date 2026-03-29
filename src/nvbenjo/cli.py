@@ -36,7 +36,7 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
 
     system_info = get_system_info()
 
-    if cfg.output_dir is not None:
+    if output_dir is not None:
         logger.info(f"Starting benchmark, output-dir {output_dir}")
 
     if len(models) == 0:
@@ -44,13 +44,13 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
         return
     results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory)
 
-    if cfg.output_dir is not None:
+    if output_dir is not None:
         results.to_csv(join(output_dir, "out.csv"))
         with open(join(output_dir, "config.yaml"), "w") as f:
             f.write(OmegaConf.to_yaml(cfg))
 
     custom_metric_keys = list(set(sum([list(mcfg.custom_batchmetrics.keys()) for mcfg in models.values()], [])))
-    if cfg.output_dir is not None:
+    if output_dir is not None:
         logger.info("Generating plots...")
         plot.visualize_results(
             results,
