@@ -1,0 +1,26 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+    resnet50:
+      type_or_path: torchvision:resnet50
+      shape: [B, 3, 224, 224]
+      num_warmup_batches: 3
+      num_batches: 5
+      batch_sizes: [8]
+      devices: ["cuda:0"]
+      runtime_options:
+        # No compilation
+        no_compile:
+          precision: AMP_BFLOAT16
+          compile: false
+        # Standard torch.compile
+        torch_compile:
+          precision: AMP_BFLOAT16
+          compile: torch_compile
+        # Ahead-of-time compilation (AMP is not supported for AOT)
+        aot_compile:
+          precision: BFLOAT16
+          compile: aot_compile

@@ -47,6 +47,12 @@ class PrecisionType(Enum):
     LONG = "long"
 
 
+class CompileMode(Enum):
+    TORCH_COMPILE = "torch_compile"
+    AOT_COMPILE = "aot_compile"
+    NONE = "none"
+
+
 def format_num(num: ty.Union[int, float], bytes: bool = False) -> ty.Union[str, None]:
     """Scale bytes to its proper format, e.g. 1253656 => '1.20MB'"""
     if num is None:

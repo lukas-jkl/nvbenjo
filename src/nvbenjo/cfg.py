@@ -1,3 +1,4 @@
+import logging
 import os
 import typing as ty
 from abc import ABC
@@ -7,7 +8,9 @@ from dataclasses import dataclass, field
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from .utils import PrecisionType, ProviderType
+from .utils import PrecisionType, ProviderType, CompileMode
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -100,10 +103,14 @@ class TorchRuntimeConfig:
 
     Parameters
     ----------
-    compile : bool
-        Whether to compile the model using torch.compile (PyTorch 2.0+).
+    compile : str
+        Model compilation mode:
+
+        - ``false`` -- No compilation (default)
+        - ``torch_compile`` -- Compile with ``torch.compile`` (PyTorch 2.0+)
+        - ``aot_compile`` -- Ahead-of-time compilation via ``torch._inductor``
     compile_kwargs : dict
-        Additional keyword arguments for torch.compile.
+        Additional keyword arguments passed to ``torch.compile`` or ``aoti_compile_and_package``.
     precision : PrecisionType
         Precision type for model inference (e.g., fp32, fp16, amp).
     enable_profiling : bool
@@ -114,12 +121,19 @@ class TorchRuntimeConfig:
         Additional keyword arguments for torch.profiler.profile.
     """
 
-    compile: bool = False
+    compile: str = "False"
     compile_kwargs: dict = field(default_factory=dict)
     precision: PrecisionType = PrecisionType.FP32
     enable_profiling: bool = False
     profiling_prefix: ty.Optional[str] = None
     profiler_kwargs: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        # Hydra passes everything as primitives, normalize here
+        if isinstance(self.compile, bool) or str(self.compile).lower() in ("true", "false"):
+            is_true = self.compile is True or str(self.compile).lower() == "true"
+            self.compile = "torch_compile" if is_true else "none"
+        self._compile_mode = CompileMode(self.compile.lower())
 
 
 @dataclass
@@ -169,7 +183,20 @@ class TorchModelConfig(BaseModelConfig):
     name : str
         Name of the model.
     type_or_path : str
-        Model type or path. Can be a local file path or a model identifier.
+        Model type or path. Supports prefixes to specify the model source:
+
+        - ``torchvision:<name>`` -- Load a torchvision model (e.g. ``torchvision:resnet50``)
+        - ``huggingface:<name>`` -- Load a HuggingFace AutoModel (e.g. ``huggingface:bert-base-uncased``)
+        - ``jit:<path>`` -- Load a TorchScript/JIT model
+        - ``torchexport:<path>`` -- Load a ``torch.export`` saved model
+        - ``aot:<path>`` -- Load a pre-compiled AOT model
+
+        .. note::
+
+            For ``torchexport`` and ``aot`` models, precision is baked in at export time
+            and cannot be changed at runtime.
+
+        - *(no prefix)* -- Path to a model saved with ``torch.save`` or ``torch.jit.save``
     kwargs : dict
         Additional keyword arguments to pass when instantiating the model.
     shape : tuple
@@ -210,6 +237,19 @@ class TorchModelConfig(BaseModelConfig):
         for i, (key, opt) in enumerate(self.runtime_options.items()):
             if isinstance(opt, DictConfig):
                 self.runtime_options[key] = OmegaConf.structured(TorchRuntimeConfig(**OmegaConf.to_container(opt)))  # type: ignore
+
+        if self.type_or_path.startswith(("aot:", "torchexport:")):
+            precisions = {rt.precision for rt in self.runtime_options.values() if isinstance(rt, TorchRuntimeConfig)}
+            if len(precisions) > 1:
+                raise ValueError(
+                    f"Model '{self.name}' is pre-exported — precision is baked in at export time. "
+                    f"Got multiple different precisions in runtime_options: {precisions}"
+                )
+            compile_modes = {
+                rt._compile_mode for rt in self.runtime_options.values() if isinstance(rt, TorchRuntimeConfig)
+            }
+            if compile_modes - {CompileMode.NONE}:
+                logger.warning(f"Model '{self.name}' is pre-exported — setting compile has no effect.")
 
 
 @dataclass

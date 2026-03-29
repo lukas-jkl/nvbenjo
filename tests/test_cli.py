@@ -182,30 +182,53 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
         return self.fc1(x) * self.fc2(y)
 
 
-@pytest.mark.parametrize("export_type", ["torchexport", "torchsave", "torchscript"])
-def test_torch_load_complex_multiinput(export_type):
+@pytest.mark.parametrize("export_type", ["aot", "torchexport", "torchsave", "torchscript"])
+@pytest.mark.parametrize("input_style", ["args", "kwargs"])
+def test_torch_load_complex_multiinput_export_types(export_type, input_style):
     if export_type == "torchexport" and torch.__version__ < "2.1":
         pytest.skip("torch.export is only available in PyTorch 2.1 and later")
+    if export_type == "aot" and torch.__version__ < "2.6":
+        pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
 
     min = 12
     max = 34
-    model = ComplexDummyModelMultiInput(min=min, max=max)
+    if input_style == "args":
+        model = DummyModelMultiInput()
+    else:
+        model = ComplexDummyModelMultiInput(min=min, max=max)
 
     with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
+        suffix = ".pt2" if export_type in ["aot"] else ".pt"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmpfile:
             if export_type == "torchsave":
                 torch.save(model, tmpfile)
-            elif export_type == "torchexport":
-                # for tochexport we need a model with simplified control flow
+            elif export_type in ("torchexport", "aot"):
+                # torchexport/aot need a model with simplified control flow
                 model = DummyModelMultiInput()
                 batch_size_dim = torch.export.Dim("B", min=1, max=1024)
-                program = torch.export.export(
-                    model,
-                    args=(torch.randn(2, 10), torch.randn(2, 20)),
-                    dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
-                )
-                torch.export.save(program, tmpfile.name)
-                torch.export.load(tmpfile.name)  # verify it can be loaded
+                if input_style == "args":
+                    program = torch.export.export(
+                        model,
+                        args=(torch.randn(2, 10), torch.randn(2, 20)),
+                        dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
+                    )
+                else:
+                    program = torch.export.export(
+                        model,
+                        args=(),
+                        kwargs={"x": torch.randn(2, 10), "y": torch.randn(2, 20)},
+                        dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
+                    )
+                if export_type == "torchexport":
+                    torch.export.save(program, tmpfile.name)
+                    torch.export.load(tmpfile.name)  # verify it can be loaded
+                elif export_type == "aot":
+                    torch._inductor.aoti_compile_and_package(
+                        program,
+                        package_path=tmpfile.name,
+                    )
+                else:
+                    raise ValueError("Invalid export type")
             elif export_type == "torchscript":
                 m = torch.jit.script(model)
                 torch.jit.save(m, tmpfile)
@@ -226,7 +249,9 @@ def test_torch_load_complex_multiinput(export_type):
                                     "FP16": {"precision": "FP16", "compile": False},
                                     "AMP_FP16": {"precision": "AMP_FP16", "compile": False},
                                 },
-                                "shape": [
+                                "shape": [["B", 10], ["B", 20]]
+                                if input_style == "args"
+                                else [
                                     {"name": "x", "shape": ["B", 10], "min_max": [min, max]},
                                     {"name": "y", "shape": ["B", 20], "min_max": [min, max]},
                                 ],
@@ -238,12 +263,12 @@ def test_torch_load_complex_multiinput(export_type):
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("AMP_FP16", None)
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("FP16", None)
 
-                if export_type == "torchexport":
-                    # torchexport does not work with named inputs
-                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["shape"] = [
-                        ["B", 10],
-                        ["B", 20],
-                    ]
+                if export_type == "aot":
+                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["type_or_path"] = f"aot:{tmpfile.name}"
+                    # AOT models are locked to their compiled precision
+                    config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"] = {
+                        "FP32": {"precision": "FP32", "compile": False},
+                    }
                 cfg = compose(
                     config_name="default",
                     overrides=[
@@ -311,6 +336,125 @@ def test_torch_load_complex_invalid_multiinput():
                         run_config(cfg)
                 else:
                     raise ValueError("Config is not a DictConfig instance")
+
+
+@pytest.mark.parametrize("compile_mode", ["aot_compile", "torch_compile"])
+@pytest.mark.parametrize("precision", ["FP32", "FP16", "AMP_FP16"])
+@pytest.mark.parametrize("extra_compile_kwargs", [False, True], ids=["default_kwargs", "extra_kwargs"])
+@pytest.mark.parametrize(
+    "model_cls,shape",
+    [
+        (DummyModel, ["B", 10]),
+        (DummyModelMultiInput, [["B", 10], ["B", 20]]),
+        (
+            DummyModelMultiInput,
+            [
+                {"name": "x", "shape": ["B", 10]},
+                {"name": "y", "shape": ["B", 20]},
+            ],
+        ),
+    ],
+    ids=["single", "multi_args", "multi_kwargs"],
+)
+def test_compile_modes(compile_mode, precision, extra_compile_kwargs, model_cls, shape):
+    if compile_mode == "aot_compile" and torch.__version__ < "2.6":
+        pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
+    if precision in ("FP16", "AMP_FP16") and torch.__version__ < "2.2":
+        pytest.skip("FP16/AMP_FP16 requires PyTorch 2.2 and later")
+    if compile_mode == "aot_compile" and precision == "AMP_FP16":
+        pytest.skip("AOT compiled models cannot use AMP precision")
+
+    if extra_compile_kwargs:
+        if compile_mode == "aot_compile":
+            compile_kwargs = {"inductor_configs": {}}
+        else:
+            compile_kwargs = {"dynamic": True}
+    else:
+        compile_kwargs = {}
+
+    model = model_cls()
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
+            torch.save(model, tmpfile)
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                config_override = {
+                    "nvbenjo": {
+                        "models": {
+                            "dummytorchmodel": {
+                                "type_or_path": tmpfile.name,
+                                "num_batches": 2,
+                                "batch_sizes": [1],
+                                "devices": ["cpu"],
+                                "runtime_options": {
+                                    precision: {
+                                        "precision": precision,
+                                        "compile": compile_mode,
+                                        "compile_kwargs": compile_kwargs,
+                                    },
+                                },
+                                "shape": shape,
+                            }
+                        }
+                    }
+                }
+                cfg = compose(
+                    config_name="default",
+                    overrides=[f"output_dir={tmpoutdir}"],
+                )
+                omegaconf.OmegaConf.set_struct(cfg, False)
+                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                omegaconf.OmegaConf.set_struct(cfg, True)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    run_config(cfg)
+                _check_run_files(cfg)
+
+
+@pytest.mark.skipif(torch.__version__ < "2.6", reason="aoti_compile_and_package requires PyTorch 2.6+")
+def test_aot_prefix_loading():
+    model = DummyModelMultiInput()
+    batch_size_dim = torch.export.Dim("B", min=1, max=1024)
+    program = torch.export.export(
+        model,
+        args=(torch.randn(2, 10), torch.randn(2, 20)),
+        dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
+    )
+
+    with initialize(version_base=None, config_path="conf"):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt2") as tmpfile:
+            torch._inductor.aoti_compile_and_package(
+                program,
+                package_path=tmpfile.name,
+            )
+            with tempfile.TemporaryDirectory() as tmpoutdir:
+                config_override = {
+                    "nvbenjo": {
+                        "models": {
+                            "aotmodel": {
+                                "type_or_path": f"aot:{tmpfile.name}",
+                                "num_batches": 2,
+                                "batch_sizes": [1, 2],
+                                "devices": ["cpu"],
+                                "runtime_options": {
+                                    "FP32": {"precision": "FP32", "compile": False},
+                                },
+                                "shape": [["B", 10], ["B", 20]],
+                            }
+                        }
+                    }
+                }
+                cfg = compose(
+                    config_name="default",
+                    overrides=[f"output_dir={tmpoutdir}"],
+                )
+                omegaconf.OmegaConf.set_struct(cfg, False)
+                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+                omegaconf.OmegaConf.set_struct(cfg, True)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    run_config(cfg)
+                _check_run_files(cfg)
 
 
 def test_cli_cn_path_arg():

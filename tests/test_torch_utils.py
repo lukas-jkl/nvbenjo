@@ -1,15 +1,17 @@
 from contextlib import nullcontext
 
+import pytest
 import torch
 from torch import nn
 
+from nvbenjo.cfg import TorchRuntimeConfig
 from nvbenjo.torch_utils import (
     apply_batch_precision,
     apply_non_amp_model_precision,
     get_amp_ctxt_for_precision,
     get_model_parameters,
 )
-from nvbenjo.utils import PrecisionType
+from nvbenjo.utils import CompileMode, PrecisionType
 
 
 def test_get_model_parameters():
@@ -71,3 +73,24 @@ def test_get_amp_ctxt_for_precision():
 
     ctxt = get_amp_ctxt_for_precision(PrecisionType.FP32, torch.device("cpu"))
     assert isinstance(ctxt, nullcontext)
+
+
+@pytest.mark.parametrize(
+    "compile_input,expected_mode",
+    [
+        (False, CompileMode.NONE),
+        (True, CompileMode.TORCH_COMPILE),
+        ("torch_compile", CompileMode.TORCH_COMPILE),
+        ("aot_compile", CompileMode.AOT_COMPILE),
+        ("none", CompileMode.NONE),
+        ("AOT_COMPILE", CompileMode.AOT_COMPILE),
+    ],
+)
+def test_runtime_config_compile_mode(compile_input, expected_mode):
+    cfg = TorchRuntimeConfig(compile=compile_input)
+    assert cfg._compile_mode == expected_mode
+
+
+def test_runtime_config_compile_invalid():
+    with pytest.raises(ValueError):
+        TorchRuntimeConfig(compile="invalid_mode")

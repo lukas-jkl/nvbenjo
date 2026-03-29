@@ -123,17 +123,24 @@ def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Opt
     return results
 
 
+class _ConditionalCountColumn(progress.ProgressColumn):
+    def render(self, task: progress.Task) -> str:
+        if task.total is None:
+            return ""
+        return f"{int(task.completed)}/{int(task.total)}"
+
+
 def _get_progress_bar() -> Progress:
     return Progress(
         "[progress.description]{task.description}",
-        progress.BarColumn(bar_width=80),
-        "[progress.percentage]{task.completed}/{task.total}",
+        progress.BarColumn(bar_width=80, pulse_style="cyan"),
+        _ConditionalCountColumn(),
         console=console,
     )
 
 
 def _run_warmup(
-    model: nn.Module,
+    model: nn.Module | Callable,
     batch: utils.TensorLike,
     device: torch.device,
     num_warmup_batches: int,
@@ -326,16 +333,15 @@ def benchmark_model(
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 
                 if num_model_parameters is None:
-                    num_model_parameters = torch_utils.get_model_parameters(model)
+                    if isinstance(model, nn.Module):
+                        num_model_parameters = torch_utils.get_model_parameters(model)
+                    else:
+                        num_model_parameters = 0
 
-                model = torch_utils.apply_non_amp_model_precision(
-                    model, precision=model_cfg.runtime_options[runtime_option_name].precision
-                )
-                if runtime_cfg.compile:
-                    model = torch.compile(model, **runtime_cfg.compile_kwargs)
-
-                if not isinstance(model, nn.Module):
-                    raise ValueError(f"Expected a torch.nn.Module but got {type(model)}")
+                if isinstance(model, nn.Module):
+                    model = torch_utils.apply_non_amp_model_precision(
+                        model, precision=model_cfg.runtime_options[runtime_option_name].precision
+                    )
 
                 # only apply precision to input if no precision is specified
                 if not set_dtype:
@@ -356,6 +362,41 @@ def benchmark_model(
                             for k, v in batch.items()
                         },
                     )
+
+                if runtime_cfg._compile_mode != utils.CompileMode.NONE:
+                    if runtime_cfg._compile_mode == utils.CompileMode.TORCH_COMPILE:
+                        model = torch.compile(model, **runtime_cfg.compile_kwargs)
+                    elif runtime_cfg._compile_mode == utils.CompileMode.AOT_COMPILE:
+                        if torch_utils.AMP_PREFIX in runtime_cfg.precision.value:
+                            raise ValueError("Can't run exported model with AMP precision")
+
+                        if isinstance(model, nn.Module):
+                            device_batch = torch_utils.transfer_to_device(batch, device)
+                            if isinstance(device_batch, dict):
+                                program = torch.export.export(model.to(device), args=(), kwargs=device_batch)
+                            else:
+                                if isinstance(device_batch, (tuple, list)):
+                                    batch_args = tuple(device_batch)
+                                else:
+                                    batch_args = (device_batch,)
+                                program = torch.export.export(model.to(device), batch_args)
+                        else:
+                            program = model.to(device)
+
+                        program = program.run_decompositions()
+                        compile_task = (
+                            progress_bar.add_task("    AOT compiling...", total=None) if progress_bar else None
+                        )
+                        try:
+                            package_path = torch._inductor.aoti_compile_and_package(
+                                program, **runtime_cfg.compile_kwargs
+                            )
+                        finally:
+                            if compile_task is not None:
+                                progress_bar.remove_task(compile_task)
+                        model = torch._inductor.aoti_load_package(package_path)
+                    else:
+                        raise ValueError(f"Unknown compile mode {runtime_cfg._compile_mode}")
 
                 with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
                     _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
