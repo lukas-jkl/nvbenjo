@@ -386,7 +386,11 @@ def test_compile_modes(compile_mode, precision, compile_kwargs, model_cls, shape
                                 "batch_sizes": [1],
                                 "devices": ["cpu"],
                                 "runtime_options": {
-                                    precision: {"precision": precision, "compile": compile_mode, "compile_kwargs": compile_kwargs},
+                                    precision: {
+                                        "precision": precision,
+                                        "compile": compile_mode,
+                                        "compile_kwargs": compile_kwargs,
+                                    },
                                 },
                                 "shape": shape,
                             }

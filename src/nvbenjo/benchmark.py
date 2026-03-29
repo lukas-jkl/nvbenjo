@@ -373,9 +373,7 @@ def benchmark_model(
                         if isinstance(model, nn.Module):
                             device_batch = torch_utils.transfer_to_device(batch, device)
                             if isinstance(device_batch, dict):
-                                program = torch.export.export(
-                                    model.to(device), args=(), kwargs=device_batch
-                                )
+                                program = torch.export.export(model.to(device), args=(), kwargs=device_batch)
                             else:
                                 if isinstance(device_batch, (tuple, list)):
                                     batch_args = tuple(device_batch)
@@ -386,9 +384,13 @@ def benchmark_model(
                             program = model.to(device)
 
                         program = program.run_decompositions()
-                        compile_task = progress_bar.add_task("    AOT compiling...", total=None) if progress_bar else None
+                        compile_task = (
+                            progress_bar.add_task("    AOT compiling...", total=None) if progress_bar else None
+                        )
                         try:
-                            package_path = torch._inductor.aoti_compile_and_package(program, **runtime_cfg.compile_kwargs)
+                            package_path = torch._inductor.aoti_compile_and_package(
+                                program, **runtime_cfg.compile_kwargs
+                            )
                         finally:
                             if compile_task is not None:
                                 progress_bar.remove_task(compile_task)
