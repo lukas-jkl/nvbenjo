@@ -120,7 +120,7 @@ def get_model(
             (
                 f"Invalid model {type_or_path}. Must be: \n"
                 "- a valid path \n"
-                "- a valid <prefix>:<path> combination"
+                "- a valid <prefix>:<path> combination\n"
                 "- a valid huggingface AutoModel (named 'huggingface:<model-name>')  \n"
                 f"- a valid torchvision model (named 'torchvision:<model-name>') from {available_torchvision_models} \n"
             )
