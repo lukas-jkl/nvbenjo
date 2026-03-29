@@ -176,7 +176,7 @@ def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, d
     console.print(Panel(table, border_style="dim", padding=(0, 1)))
 
 
-def _print_summary_plot(results: pd.Series | pd.DataFrame, model: str, device: str, custom_metric_keys: List):
+def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: List):
     default_metric = "time_total_batch_normalized"
     default_metric_title = "Time Batch Normalized"
     if not custom_metric_keys:
@@ -250,4 +250,4 @@ def print_results(results: pd.DataFrame, custom_metric_keys: List[str] = []):
         for device in model_results.device.unique():
             _print_device_results(model_results, model, device, custom_metric_keys)
 
-    _print_summary_plot(results, model, device, custom_metric_keys)
+    _print_summary_plot(results, custom_metric_keys)
