@@ -1,7 +1,7 @@
 # Nvbenjo Documentation
 
 Nvbenjo is a utility for benchmarking inference of deep learning models on NVIDIA GPUs.
-It supports models in [Onnx](https://onnx.ai/) format as well as [PyTorch](https://pytorch.org/) models.
+It supports models in [Onnx](https://onnx.ai/) format as well as [PyTorch](https://pytorch.org/) models, including `torch.compile` and ahead-of-time (AOT) compiled models.
 
 Nvbenjo generates comprehensive benchmark results including:
 - **CSV file** with all measurement data (latency, throughput, memory usage, etc.)

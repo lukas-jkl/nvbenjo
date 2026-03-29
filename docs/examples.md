@@ -47,6 +47,14 @@
    :caption: Example Configuration of Huggingface Models
 ```
 
+### Compilation (torch.compile & AOT)
+
+```{eval-rst}
+.. literalinclude:: ../src/nvbenjo/conf/compile_example.yaml
+   :language: yaml
+   :caption: Example Configuration with torch.compile and AOT compilation
+```
+
 ## Advanced Examples
 
 ```{eval-rst}

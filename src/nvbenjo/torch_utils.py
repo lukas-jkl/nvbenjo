@@ -26,16 +26,14 @@ def get_model(
     Parameters
     ----------
     type_or_path : str
-        Model type or path. This can be:
+        Model type or path. Supports prefixes to specify the model source:
 
-        If no prefix is provided:
-        - a valid path to a saved torch model (saved with torch.save or torch.jit.save)
-        If a prefix is provided as `<prefix>:<path>`
-        - a JIT model (named 'jit:<path>')
-        - a torch.export model (named 'torchexport:<path>')
-        - an AOT-compiled model (named 'aot:<path>')
-        - a valid huggingface AutoModel (named 'huggingface:<model-name>') see https://huggingface.co/docs/transformers/model_doc/auto
-        - a valid torchvision model (named 'torchvision:<model-name>') see `torchvision.models.list_models()`
+        - ``torchvision:<name>`` -- Load a torchvision model (e.g. ``torchvision:resnet50``), see `torchvision.models.list_models()`
+        - ``huggingface:<name>`` -- Load a HuggingFace AutoModel (e.g. ``huggingface:bert-base-uncased``), see https://huggingface.co/docs/transformers/model_doc/auto
+        - ``jit:<path>`` -- Load a TorchScript/JIT model
+        - ``torchexport:<path>`` -- Load a ``torch.export`` saved model
+        - ``aot:<path>`` -- Load a pre-compiled AOT model
+        - *(no prefix)* -- Path to a model saved with ``torch.save`` or ``torch.jit.save``
 
     device : torch.device
         Device to load the model onto.

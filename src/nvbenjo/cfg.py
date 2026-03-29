@@ -101,10 +101,13 @@ class TorchRuntimeConfig:
     Parameters
     ----------
     compile : str
-        Whether to compile the model using torch.compile (PyTorch 2.0+) or other compile modes.
-        May be True|False or a string specifying the compile type (e.g., "torch_compile", "aot_compile").
+        Model compilation mode:
+
+        - ``false`` -- No compilation (default)
+        - ``torch_compile`` -- Compile with ``torch.compile`` (PyTorch 2.0+)
+        - ``aot_compile`` -- Ahead-of-time compilation via ``torch._inductor``
     compile_kwargs : dict
-        Additional keyword arguments for torch.compile.
+        Additional keyword arguments passed to ``torch.compile`` or ``aoti_compile_and_package``.
     precision : PrecisionType
         Precision type for model inference (e.g., fp32, fp16, amp).
     enable_profiling : bool
@@ -177,7 +180,20 @@ class TorchModelConfig(BaseModelConfig):
     name : str
         Name of the model.
     type_or_path : str
-        Model type or path. Can be a local file path or a model identifier.
+        Model type or path. Supports prefixes to specify the model source:
+
+        - ``torchvision:<name>`` -- Load a torchvision model (e.g. ``torchvision:resnet50``)
+        - ``huggingface:<name>`` -- Load a HuggingFace AutoModel (e.g. ``huggingface:bert-base-uncased``)
+        - ``jit:<path>`` -- Load a TorchScript/JIT model
+        - ``torchexport:<path>`` -- Load a ``torch.export`` saved model
+        - ``aot:<path>`` -- Load a pre-compiled AOT model
+
+        .. note::
+
+            For ``torchexport`` and ``aot`` models, precision is baked in at export time
+            and cannot be changed at runtime.
+
+        - *(no prefix)* -- Path to a model saved with ``torch.save`` or ``torch.jit.save``
     kwargs : dict
         Additional keyword arguments to pass when instantiating the model.
     shape : tuple
