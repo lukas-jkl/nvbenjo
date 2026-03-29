@@ -184,7 +184,7 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
 
 @pytest.mark.parametrize("export_type", ["aot", "torchexport", "torchsave", "torchscript"])
 @pytest.mark.parametrize("input_style", ["args", "kwargs"])
-def test_torch_load_complex_multiinput(export_type, input_style):
+def test_torch_load_complex_multiinput_export_types(export_type, input_style):
     if export_type == "torchexport" and torch.__version__ < "2.1":
         pytest.skip("torch.export is only available in PyTorch 2.1 and later")
     if export_type == "aot" and torch.__version__ < "2.6":
