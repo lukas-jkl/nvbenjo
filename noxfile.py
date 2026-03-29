@@ -18,7 +18,7 @@ def test_lint(session):
 def test_python(session, torch):
     session.install(f"torch=={torch}")
     session.install("-e", ".[onnx-cpu]", "--group", "dev")
-    session.run("pytest")
+    session.run("pytest", "-n", "4")
 
 
 @nox.session(name="test-torch", venv_backend="uv")
@@ -27,7 +27,7 @@ def test_python(session, torch):
 def test_torch(session, torch):
     session.install(f"torch=={torch}")
     session.install("-e", ".[onnx-cpu]", "--group", "dev")
-    session.run("pytest")
+    session.run("pytest", "-n", "4")
 
 
 @nox.session(name="test-examples", venv_backend="uv", default=False)
@@ -51,7 +51,6 @@ def test_examples(session, torch):
             print(f"File {path} already exists, skipping download.")
             continue
         print(f"Downloading {url} to {path}...")
-        os.path.name
         with open(os.path.expanduser(path), "wb") as f:
             f.write(requests.get(url).content)
 
