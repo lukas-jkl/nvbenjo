@@ -86,7 +86,7 @@ def test_aot_cache_skips_recompile(tmp_path):
     assert len(files) == 1, f"expected 1 cached package, got {files}"
     cache_file = cache_dir / files[0]
     first_mtime = cache_file.stat().st_mtime
-    firs    t_size = cache_file.stat().st_size
+    first_size = cache_file.stat().st_size
 
     # Second run with identical config: cache hit, file untouched
     benchmark.benchmark_models({"model_1": make_cfg(1)})

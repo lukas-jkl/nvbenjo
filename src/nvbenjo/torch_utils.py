@@ -66,12 +66,12 @@ def get_model(
         if verbose and console is not None:
             console.print(f"Loading jit model {type_or_path}")
         type_or_path = type_or_path[len("jit:") :]
-        return torch.jit.load(type_or_path, map_location=device)
+        return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
     elif type_or_path.startswith("torchexport:"):
         if verbose and console is not None:
             console.print(f"Loading torchexport model {type_or_path}")
         type_or_path = type_or_path[len("torchexport:") :]
-        program = torch.export.load(type_or_path)
+        program = torch.export.load(os.path.expanduser(type_or_path))
         module = program.module()
         module = module.to(device)
         return module
@@ -79,27 +79,27 @@ def get_model(
         if verbose and console is not None:
             console.print(f"Loading AOT model {type_or_path}")
         type_or_path = type_or_path[len("aot:") :]
-        return torch._inductor.aoti_load_package(type_or_path)
+        return torch._inductor.aoti_load_package(os.path.expanduser(type_or_path))
     elif os.path.isfile(type_or_path):
         # Path and no prefix -> try different methods
         if verbose and console is not None:
             console.print(f"Loading torch model {type_or_path}")
         try:
-            model = torch.load(type_or_path, map_location=device, weights_only=False)
+            model = torch.load(os.path.expanduser(type_or_path), map_location=device, weights_only=False)
             model.eval()
             return model
         except Exception:
             try:
-                return torch.jit.load(type_or_path, map_location=device)
+                return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
             except Exception:
                 if torch.__version__ > "2.1":
                     try:
-                        program = torch.export.load(type_or_path)
+                        program = torch.export.load(os.path.expanduser(type_or_path))
                         module = program.module()
                         module = module.to(device)
                         return module
                     except Exception:
-                        return torch._inductor.aoti_load_package(type_or_path)
+                        return torch._inductor.aoti_load_package(os.path.expanduser(type_or_path))
                 else:
                     raise
 
@@ -109,7 +109,7 @@ def get_model(
             console.print(f"Loading huggingface model {type_or_path}")
         from transformers import AutoModel  # type: ignore
 
-        return AutoModel.from_pretrained(type_or_path).to(device)
+        return AutoModel.from_pretrained(os.path.expanduser(type_or_path)).to(device)
     elif type_or_path.startswith("torchvision:"):
         type_or_path = type_or_path[len("torchvision:") :]
         available_torchvision_models = torchvision.models.list_models()
