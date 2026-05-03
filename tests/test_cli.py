@@ -412,7 +412,9 @@ def test_compile_modes(compile_mode, precision, extra_compile_kwargs, model_cls,
                 _check_run_files(cfg)
 
 
-@pytest.mark.skipif(Version(torch.__version__) < Version("2.6"), reason="aoti_compile_and_package requires PyTorch 2.6+")
+@pytest.mark.skipif(
+    Version(torch.__version__) < Version("2.6"), reason="aoti_compile_and_package requires PyTorch 2.6+"
+)
 def test_aot_prefix_loading():
     model = DummyModelMultiInput()
     batch_size_dim = torch.export.Dim("B", min=1, max=1024)
