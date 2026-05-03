@@ -14,6 +14,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torchvision
+from packaging.version import Version
 
 try:
     # PyTorch's aoti_load_package reaches for torch._inductor.codecache without
@@ -99,7 +100,7 @@ def get_model(
             try:
                 return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
             except Exception:
-                if torch.__version__ > "2.1":
+                if Version(torch.__version__) > Version("2.1"):
                     try:
                         program = torch.export.load(os.path.expanduser(type_or_path))
                         module = program.module()

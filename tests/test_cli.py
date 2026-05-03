@@ -13,6 +13,7 @@ import pytest
 import torch
 import yaml
 from hydra import compose, initialize
+from packaging.version import Version
 
 from nvbenjo.cli import run
 
@@ -185,9 +186,9 @@ class ComplexDummyModelMultiInput(torch.nn.Module):
 @pytest.mark.parametrize("export_type", ["aot", "torchexport", "torchsave", "torchscript"])
 @pytest.mark.parametrize("input_style", ["args", "kwargs"])
 def test_torch_load_complex_multiinput_export_types(export_type, input_style):
-    if export_type == "torchexport" and torch.__version__ < "2.1":
+    if export_type == "torchexport" and Version(torch.__version__) < Version("2.1"):
         pytest.skip("torch.export is only available in PyTorch 2.1 and later")
-    if export_type == "aot" and torch.__version__ < "2.6":
+    if export_type == "aot" and Version(torch.__version__) < Version("2.6"):
         pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
 
     min = 12
@@ -259,7 +260,7 @@ def test_torch_load_complex_multiinput_export_types(export_type, input_style):
                         }
                     }
                 }
-                if torch.__version__ < "2.2":
+                if Version(torch.__version__) < Version("2.2"):
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("AMP_FP16", None)
                     config_override["nvbenjo"]["models"]["dummytorchmodel"]["runtime_options"].pop("FP16", None)
 
@@ -357,9 +358,9 @@ def test_torch_load_complex_invalid_multiinput():
     ids=["single", "multi_args", "multi_kwargs"],
 )
 def test_compile_modes(compile_mode, precision, extra_compile_kwargs, model_cls, shape):
-    if compile_mode == "aot_compile" and torch.__version__ < "2.6":
+    if compile_mode == "aot_compile" and Version(torch.__version__) < Version("2.6"):
         pytest.skip("aoti_compile_and_package is only available in PyTorch 2.6 and later")
-    if precision in ("FP16", "AMP_FP16") and torch.__version__ < "2.2":
+    if precision in ("FP16", "AMP_FP16") and Version(torch.__version__) < Version("2.2"):
         pytest.skip("FP16/AMP_FP16 requires PyTorch 2.2 and later")
     if compile_mode == "aot_compile" and precision == "AMP_FP16":
         pytest.skip("AOT compiled models cannot use AMP precision")
@@ -411,7 +412,7 @@ def test_compile_modes(compile_mode, precision, extra_compile_kwargs, model_cls,
                 _check_run_files(cfg)
 
 
-@pytest.mark.skipif(torch.__version__ < "2.6", reason="aoti_compile_and_package requires PyTorch 2.6+")
+@pytest.mark.skipif(Version(torch.__version__) < Version("2.6"), reason="aoti_compile_and_package requires PyTorch 2.6+")
 def test_aot_prefix_loading():
     model = DummyModelMultiInput()
     batch_size_dim = torch.export.Dim("B", min=1, max=1024)
