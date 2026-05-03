@@ -14,6 +14,13 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torchvision
+
+try:
+    # PyTorch's aoti_load_package reaches for torch._inductor.codecache without
+    # importing it, so register the attribute up front when available.
+    import torch._inductor.codecache  # noqa: F401
+except ImportError:
+    pass
 from rich.progress import Progress
 
 from nvbenjo import console
