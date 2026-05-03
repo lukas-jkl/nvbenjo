@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 import pytest
 import torch
 import torch.nn as nn
+from packaging.version import Version
 
 from nvbenjo import benchmark, cfg
 from nvbenjo.utils import PrecisionType
@@ -55,7 +56,7 @@ def test_pytorch_simple():
         assert profile_files[0].endswith(".json")
 
 
-@pytest.mark.skipif(torch.__version__ < "2.6", reason="aoti_compile_and_package requires PyTorch 2.6+")
+@pytest.mark.skipif(Version(torch.__version__) < Version("2.6"), reason="aoti_compile_and_package requires PyTorch 2.6+")
 def test_aot_cache_skips_recompile(tmp_path):
     torch.manual_seed(0)
     model_path = tmp_path / "tiny.pt"
