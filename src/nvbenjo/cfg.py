@@ -4,11 +4,17 @@ import typing as ty
 from abc import ABC
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-
+from pathlib import Path
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf, open_dict
 
 from .utils import PrecisionType, ProviderType, CompileMode
+
+
+def _default_cache_dir() -> str:
+    base = os.environ.get("XDG_CACHE_HOME") or "~/.cache"
+    return str(Path(base).expanduser() / "nvbenjo" / "torchcache")
+
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +125,14 @@ class TorchRuntimeConfig:
         Prefix for profiler output files. If None, a default path will be used.
     profiler_kwargs : dict
         Additional keyword arguments for torch.profiler.profile.
+    cache_dir : str or None
+        Directory for caching AOT-compiled packages. When set, the AOT compile
+        step is skipped on cache hits keyed by (torch/cuda version, model
+        identity, file size+mtime for path-based models, shape, batch_size,
+        precision, compile_kwargs, device type, GPU compute capability).
+        Defaults to ``$XDG_CACHE_HOME/nvbenjo/torchcache`` (or
+        ``~/.cache/nvbenjo/torchcache`` if ``XDG_CACHE_HOME`` is unset).
+        Set to ``None`` to disable caching.
     """
 
     compile: str = "False"
@@ -127,6 +141,7 @@ class TorchRuntimeConfig:
     enable_profiling: bool = False
     profiling_prefix: ty.Optional[str] = None
     profiler_kwargs: dict = field(default_factory=dict)
+    cache_dir: ty.Optional[str] = field(default_factory=_default_cache_dir)
 
     def __post_init__(self):
         # Hydra passes everything as primitives, normalize here
