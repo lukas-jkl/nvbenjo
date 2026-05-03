@@ -369,32 +369,15 @@ def benchmark_model(
                     elif runtime_cfg._compile_mode == utils.CompileMode.AOT_COMPILE:
                         if torch_utils.AMP_PREFIX in runtime_cfg.precision.value:
                             raise ValueError("Can't run exported model with AMP precision")
-
-                        if isinstance(model, nn.Module):
-                            device_batch = torch_utils.transfer_to_device(batch, device)
-                            if isinstance(device_batch, dict):
-                                program = torch.export.export(model.to(device), args=(), kwargs=device_batch)
-                            else:
-                                if isinstance(device_batch, (tuple, list)):
-                                    batch_args = tuple(device_batch)
-                                else:
-                                    batch_args = (device_batch,)
-                                program = torch.export.export(model.to(device), batch_args)
-                        else:
-                            program = model.to(device)
-
-                        program = program.run_decompositions()
-                        compile_task = (
-                            progress_bar.add_task("    AOT compiling...", total=None) if progress_bar else None
+                        model = torch_utils._aot_compile_or_load(
+                            model=model,
+                            batch=batch,
+                            device=device,
+                            model_cfg=model_cfg,
+                            batch_size=batch_size,
+                            runtime_cfg=runtime_cfg,
+                            progress_bar=progress_bar,
                         )
-                        try:
-                            package_path = torch._inductor.aoti_compile_and_package(
-                                program, **runtime_cfg.compile_kwargs
-                            )
-                        finally:
-                            if compile_task is not None:
-                                progress_bar.remove_task(compile_task)
-                        model = torch._inductor.aoti_load_package(package_path)
                     else:
                         raise ValueError(f"Unknown compile mode {runtime_cfg._compile_mode}")
 

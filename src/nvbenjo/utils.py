@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import typing as ty
 import pandas as pd
 from enum import Enum
 from omegaconf.listconfig import ListConfig
 from omegaconf.dictconfig import DictConfig
 
+from rich.progress import Progress
 import torch
 
 BATCH_SIZE_IDENTIFIERS = ("B", "batch_size")
@@ -200,3 +202,15 @@ def calculate_batchmetrics(results: pd.DataFrame, custom_batchmetrics: dict[str,
     for metric_name, value in custom_batchmetrics.items():
         results[metric_name] = value / results["time_total_batch_normalized"]
     return results
+
+
+@contextmanager
+def progress_task(progress: ty.Optional[Progress], task_name: str, **kwargs):
+    if progress is None:
+        yield None
+    else:
+        task = progress.add_task(task_name, **kwargs)
+        try:
+            yield task
+        finally:
+            progress.remove_task(task)

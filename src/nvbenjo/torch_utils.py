@@ -1,19 +1,31 @@
+import hashlib
+import json
 import logging
 import os
+import re
 import time
 import typing as ty
 from collections.abc import Sequence
 from contextlib import AbstractContextManager, nullcontext
-from typing import Callable, Optional
+from pathlib import Path
+from typing import Any, Callable, Optional
 
 import pandas as pd
 import torch
 import torch.nn as nn
 import torchvision
 
+try:
+    # PyTorch's aoti_load_package reaches for torch._inductor.codecache without
+    # importing it, so register the attribute up front when available.
+    import torch._inductor.codecache  # noqa: F401
+except ImportError:
+    pass
+from rich.progress import Progress
+
 from nvbenjo import console
-from nvbenjo.cfg import TorchRuntimeConfig
-from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike
+from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
+from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +73,12 @@ def get_model(
         if verbose and console is not None:
             console.print(f"Loading jit model {type_or_path}")
         type_or_path = type_or_path[len("jit:") :]
-        return torch.jit.load(type_or_path, map_location=device)
+        return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
     elif type_or_path.startswith("torchexport:"):
         if verbose and console is not None:
             console.print(f"Loading torchexport model {type_or_path}")
         type_or_path = type_or_path[len("torchexport:") :]
-        program = torch.export.load(type_or_path)
+        program = torch.export.load(os.path.expanduser(type_or_path))
         module = program.module()
         module = module.to(device)
         return module
@@ -74,27 +86,27 @@ def get_model(
         if verbose and console is not None:
             console.print(f"Loading AOT model {type_or_path}")
         type_or_path = type_or_path[len("aot:") :]
-        return torch._inductor.aoti_load_package(type_or_path)
+        return torch._inductor.aoti_load_package(os.path.expanduser(type_or_path))
     elif os.path.isfile(type_or_path):
         # Path and no prefix -> try different methods
         if verbose and console is not None:
             console.print(f"Loading torch model {type_or_path}")
         try:
-            model = torch.load(type_or_path, map_location=device, weights_only=False)
+            model = torch.load(os.path.expanduser(type_or_path), map_location=device, weights_only=False)
             model.eval()
             return model
         except Exception:
             try:
-                return torch.jit.load(type_or_path, map_location=device)
+                return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
             except Exception:
                 if torch.__version__ > "2.1":
                     try:
-                        program = torch.export.load(type_or_path)
+                        program = torch.export.load(os.path.expanduser(type_or_path))
                         module = program.module()
                         module = module.to(device)
                         return module
                     except Exception:
-                        return torch._inductor.aoti_load_package(type_or_path)
+                        return torch._inductor.aoti_load_package(os.path.expanduser(type_or_path))
                 else:
                     raise
 
@@ -104,7 +116,7 @@ def get_model(
             console.print(f"Loading huggingface model {type_or_path}")
         from transformers import AutoModel  # type: ignore
 
-        return AutoModel.from_pretrained(type_or_path).to(device)
+        return AutoModel.from_pretrained(os.path.expanduser(type_or_path)).to(device)
     elif type_or_path.startswith("torchvision:"):
         type_or_path = type_or_path[len("torchvision:") :]
         available_torchvision_models = torchvision.models.list_models()
@@ -355,3 +367,101 @@ def measure_repeated_inference_timing(
     results_raw = pd.DataFrame(results_raw)
 
     return results_raw
+
+
+def _file_meta(type_or_path: str) -> Optional[dict]:
+    path = type_or_path
+    for prefix in ("jit:", "torchexport:", "aot:"):
+        if path.startswith(prefix):
+            path = path[len(prefix) :]
+            break
+    path = os.path.expanduser(path)
+    if os.path.isfile(path):
+        st = os.stat(path)
+        return {"name": os.path.basename(path), "size": st.st_size, "mtime": st.st_mtime}
+    return None
+
+
+def _aot_cache_path(
+    cache_dir: str,
+    model_cfg: TorchModelConfig,
+    batch_size: int,
+    runtime_cfg: TorchRuntimeConfig,
+    device: torch.device,
+) -> Path:
+    key_parts: dict = {
+        "torch": torch.__version__,
+        "cuda_version": torch.version.cuda,
+        "type_or_path": model_cfg.type_or_path,
+        "model_kwargs": sorted(model_cfg.kwargs.items()),
+        "file_meta": _file_meta(model_cfg.type_or_path),
+        "shape": list(model_cfg.shape),
+        "batch_size": batch_size,
+        "precision": runtime_cfg.precision.value,
+        "compile_kwargs": sorted((k, v) for k, v in runtime_cfg.compile_kwargs.items() if k != "package_path"),
+        "device_type": device.type,
+    }
+    if device.type == "cuda":
+        key_parts["sm"] = torch.cuda.get_device_capability(device)
+        key_parts["device_name"] = torch.cuda.get_device_name(device)
+    digest = hashlib.sha256(json.dumps(key_parts, default=str, sort_keys=True).encode()).hexdigest()[:16]
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", model_cfg.name)
+    return Path(cache_dir).expanduser() / f"{safe_name}_{digest}.pt2"
+
+
+def _export_program(model: Any, batch: TensorLike, device: torch.device) -> Any:
+    if not isinstance(model, nn.Module):
+        return model.to(device)
+    device_batch = transfer_to_device(batch, device)
+    if isinstance(device_batch, dict):
+        return torch.export.export(model.to(device), args=(), kwargs=device_batch)
+    if isinstance(device_batch, (tuple, list)):
+        batch_args = tuple(device_batch)
+    else:
+        batch_args = (device_batch,)
+    return torch.export.export(model.to(device), batch_args)
+
+
+def _aot_compile_or_load(
+    model: Any,
+    batch: TensorLike,
+    device: torch.device,
+    model_cfg: TorchModelConfig,
+    batch_size: int,
+    runtime_cfg: TorchRuntimeConfig,
+    progress_bar: Optional[Progress],
+) -> Any:
+    cache_path = (
+        _aot_cache_path(runtime_cfg.cache_dir, model_cfg, batch_size, runtime_cfg, device)
+        if runtime_cfg.cache_dir
+        else None
+    )
+
+    if cache_path is not None and cache_path.exists():
+        with progress_task(progress_bar, f"    Load AOT compiled model {cache_path}...", total=None):
+            try:
+                return torch._inductor.aoti_load_package(str(cache_path))
+            except Exception:
+                console.print(f"Failed to load AOT cache {cache_path}, falling back to recompile")
+                console.print_exception()
+
+    program = _export_program(model, batch, device)
+    program = program.run_decompositions()
+
+    compile_kwargs = dict(runtime_cfg.compile_kwargs)
+    if cache_path is not None:
+        if "package_path" in compile_kwargs:
+            raise ValueError("Cannot set both runtime_config.cache_dir and compile_kwargs['package_path']")
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        # Compile to a sibling tmp path, then atomic-rename. Keep the .pt2 suffix
+        # because aoti_compile_and_package validates package_path ends in .pt2.
+        tmp_path = cache_path.with_name(f"{cache_path.stem}.tmp{cache_path.suffix}")
+        compile_kwargs["package_path"] = str(tmp_path)
+        with progress_task(progress_bar, "    AOT compiling...", total=None):
+            torch._inductor.aoti_compile_and_package(program, **compile_kwargs)
+        os.replace(tmp_path, cache_path)
+        return torch._inductor.aoti_load_package(str(cache_path))
+    else:
+        with progress_task(progress_bar, "    AOT compiling...", total=None):
+            package_path = torch._inductor.aoti_compile_and_package(program, **compile_kwargs)
+        return torch._inductor.aoti_load_package(package_path)
