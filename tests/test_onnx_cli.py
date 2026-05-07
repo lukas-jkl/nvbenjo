@@ -46,7 +46,7 @@ def test_onnx(do_profile: bool):
                     "nvbenjo": {
                         "models": {
                             "dummyonnxmodel": {
-                                "type_or_path": tmpfile.name,
+                                "type_or_path": f"onnx:{tmpfile.name}",
                                 "num_batches": 2,
                                 "batch_sizes": [1, 2],
                                 "devices": ["cpu"],
