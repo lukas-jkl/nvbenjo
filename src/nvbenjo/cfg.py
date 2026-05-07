@@ -326,7 +326,7 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
         ctxt = open_dict(model) if isinstance(model, DictConfig) else nullcontext()
         if "_target_" not in model:
             with ctxt:
-                if model["type_or_path"].endswith(".onnx"):
+                if model["type_or_path"].endswith(".onnx") or model["type_or_path"].startswith("onnx:"):
                     cfg.nvbenjo.models[model_name]["_target_"] = (
                         f"{OnnxModelConfig.__module__}.{OnnxModelConfig.__qualname__}"
                     )

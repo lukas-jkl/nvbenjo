@@ -41,6 +41,8 @@ def get_model(
     ort.InferenceSession
         Loaded ONNX InferenceSession.
     """
+    if type_or_path.startswith("onnx:"):
+        type_or_path = type_or_path[len("onnx:") :]
     type_or_path = os.path.expanduser(type_or_path)
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
