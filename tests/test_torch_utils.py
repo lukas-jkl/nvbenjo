@@ -10,6 +10,7 @@ from nvbenjo.torch_utils import (
     apply_non_amp_model_precision,
     get_amp_ctxt_for_precision,
     get_model_parameters,
+    run_model_with_input,
 )
 from nvbenjo.utils import CompileMode, PrecisionType
 
@@ -94,3 +95,13 @@ def test_runtime_config_compile_mode(compile_input, expected_mode):
 def test_runtime_config_compile_invalid():
     with pytest.raises(ValueError):
         TorchRuntimeConfig(compile="invalid_mode")
+
+
+def test_run_model_with_input_dict_as_single_arg():
+    class DictArgModel(nn.Module):
+        def forward(self, x):
+            return x["a"] + x["b"]
+
+    model = DictArgModel()
+    out = run_model_with_input(model, {"a": torch.tensor([1.0]), "b": torch.tensor([2.0])})
+    assert torch.equal(out, torch.tensor([3.0]))

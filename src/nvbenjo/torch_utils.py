@@ -144,7 +144,11 @@ def run_model_with_input(model: nn.Module | Callable, input: TensorLike) -> Tens
     if isinstance(input, (list, tuple)):
         return model(*input)
     elif isinstance(input, dict):
-        return model(**{str(k): v for k, v in input.items()})
+        # Some models take the dict as a single positional arg for these accept fallback
+        try:
+            return model(**{str(k): v for k, v in input.items()})
+        except TypeError:
+            return model(input)
     else:
         return model(input)
 
