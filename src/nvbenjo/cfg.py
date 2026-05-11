@@ -50,9 +50,9 @@ class BaseModelConfig(ABC):
             custom_batchmetrics:
                 fps: 1.0
                 batch-per-second: 1.0
-        or if each batch is 3s of audio you can calculate the real time factor as:
+        or if each sample in the batch is 3s of audio you can calculate the real time factor as:
             custom_batchmetrics:
-                real-time-factor: 1/3
+                real-time-factor: 3
     """
 
     name: str = "resnet"
