@@ -7,6 +7,7 @@ from os.path import join
 
 import hydra
 from hydra.core.config_store import ConfigStore
+from importlib.metadata import version
 from omegaconf import DictConfig, OmegaConf
 from rich.logging import RichHandler
 
@@ -89,6 +90,9 @@ def _fix_config_path():
 
 
 def nvbenjo():
+    if "--version" in sys.argv:
+        print(f"nvbenjo {version('nvbenjo')}")
+        sys.exit(0)
     _fix_config_path()
     _run_nvbenjo()
 
