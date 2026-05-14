@@ -442,10 +442,17 @@ def _aot_compile_or_load(
         else None
     )
 
+    # run_single_threaded avoids internal threading that conflicts with
+    # external CUDA graph capture (pytorch/pytorch#158834, fixed in 2.8+).
+    # see https://github.com/pytorch/pytorch/commit/85467ed063d284fa21a2f1d2adfec8fda544923d
+    load_kwargs: dict[str, Any] = {}
+    if runtime_cfg.cuda_graphs:
+        load_kwargs["run_single_threaded"] = True
+
     if cache_path is not None and cache_path.exists():
         with progress_task(progress_bar, f"    Load AOT compiled model {cache_path}...", total=None):
             try:
-                return torch._inductor.aoti_load_package(str(cache_path))
+                return torch._inductor.aoti_load_package(str(cache_path), **load_kwargs)
             except Exception:
                 console.print(f"Failed to load AOT cache {cache_path}, falling back to recompile")
                 console.print_exception()
@@ -465,11 +472,11 @@ def _aot_compile_or_load(
         with progress_task(progress_bar, "    AOT compiling...", total=None):
             torch._inductor.aoti_compile_and_package(program, **compile_kwargs)
         os.replace(tmp_path, cache_path)
-        return torch._inductor.aoti_load_package(str(cache_path))
+        return torch._inductor.aoti_load_package(str(cache_path), **load_kwargs)
     else:
         with progress_task(progress_bar, "    AOT compiling...", total=None):
             package_path = torch._inductor.aoti_compile_and_package(program, **compile_kwargs)
-        return torch._inductor.aoti_load_package(package_path)
+        return torch._inductor.aoti_load_package(package_path, **load_kwargs)
 
 
 def _copy_into(dst: TensorLike, src: TensorLike) -> None:
@@ -507,11 +514,14 @@ class _CudaGraphedModel:
         static_input: TensorLike,
         static_output: ty.Any,
         device: torch.device,
+        model: ty.Any = None,
     ):
         self.graph = graph
         self.static_input = static_input
         self.static_output = static_output
         self.device = device
+        # Keep the original model alive so its CUDA resources aren't freed.
+        self._model = model
         if isinstance(static_input, dict):
             self._pick_src = lambda args, kwargs: kwargs
         elif isinstance(static_input, (list, tuple)):
@@ -572,4 +582,4 @@ def _cuda_graph_capture(
         with torch.cuda.graph(graph, **(capture_kwargs or {})):
             static_output = run_model_with_input(model, static_input)
 
-    return _CudaGraphedModel(graph, static_input, static_output, device)
+    return _CudaGraphedModel(graph, static_input, static_output, device, model=model)

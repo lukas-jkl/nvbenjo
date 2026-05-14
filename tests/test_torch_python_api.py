@@ -123,3 +123,33 @@ def test_cuda_graph():
     runtimes = set(results.runtime_options.to_numpy())
     assert {"eager", "graphed"}.issubset(runtimes)
     assert len(results[results.runtime_options == "graphed"]) == num_batches
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA Graphs require a CUDA device")
+@pytest.mark.skipif(
+    Version(torch.__version__) < Version("2.6"), reason="aoti_compile_and_package requires PyTorch 2.6+"
+)
+def test_aot_cuda_graph(tmp_path):
+    num_batches = 1
+    cache_dir = tmp_path / "cache"
+    model_cfg = cfg.TorchModelConfig(
+        name="aot-cuda-graph-tiny",
+        type_or_path="torchvision:shufflenet_v2_x0_5",
+        shape=(("B", 3, 224, 224),),
+        devices=("cuda",),
+        batch_sizes=(1,),
+        num_warmup_batches=1,
+        num_batches=num_batches,
+        runtime_options={
+            "aot_graphed": cfg.TorchRuntimeConfig(
+                compile="aot_compile",
+                precision=PrecisionType.FP16,
+                cuda_graphs=True,
+                cache_dir=str(cache_dir),
+            ),
+        },
+    )
+    results = benchmark.benchmark_models({"model_1": model_cfg})
+    assert not results.empty
+    assert "aot_graphed" in results.runtime_options.to_numpy()
+    assert len(results[results.runtime_options == "aot_graphed"]) == num_batches
