@@ -28,7 +28,7 @@ def _get_architecture_name_from_version(version: int) -> str:
     return f"Version {version} ({version_names.get(version, 'Unknown')})"
 
 
-def get_gpu_info() -> list[dict[str, Any]]:
+def get_gpu_info() -> dict[str, Any]:
     """Retrieve information about GPUs in the system.
 
     Includes information such as name, architecture, memory, clock speeds, CUDA capability, and driver version.
@@ -38,18 +38,26 @@ def get_gpu_info() -> list[dict[str, Any]]:
     list[dict[str, Any]]
         A list of dictionaries containing GPU information.
     """
+    cuda_info = {}
     pynvml.nvmlInit()
     device_count = pynvml.nvmlDeviceGetCount()
-    infos = []
+    cuda_info["driver_version"] = str(pynvml.nvmlSystemGetDriverVersion())
+    try:
+        import torch
+
+        cuda_info["torch_version"] = str(torch.__version__)
+        cuda_info["cudnn_version"] = str(torch.backends.cudnn.version())
+    except ImportError:
+        pass
+
+    gpus = []
     for i in range(device_count):
         handle = pynvml.nvmlDeviceGetHandleByIndex(i)
         compute_capability = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
         clock_gpu = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_GRAPHICS)
         clock_mem = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_MEM)
-        # clock_sm = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_SM)
-        # clock_video = pynvml.nvmlDeviceGetClockInfo(handle, pynvml.NVML_CLOCK_VIDEO)
 
-        infos.append(
+        gpus.append(
             {
                 "idx": i,
                 "name": pynvml.nvmlDeviceGetName(handle),
@@ -58,11 +66,11 @@ def get_gpu_info() -> list[dict[str, Any]]:
                 "clock_gpu": f"{clock_gpu} Mhz",
                 "clock_mem": f"{clock_mem} Mhz",
                 "cuda_capability": f"{compute_capability[0]}.{compute_capability[1]}",
-                "driver": str(pynvml.nvmlSystemGetDriverVersion()),
             }
         )
     pynvml.nvmlShutdown()
-    return infos
+    cuda_info["gpus"] = gpus
+    return cuda_info
 
 
 def get_gpu_power_usage(device_index: int) -> float:
@@ -86,10 +94,10 @@ def get_system_info() -> dict[str, Any]:
     cpu = get_cpu_info()
     svmem = psutil.virtual_memory()
     try:
-        gpus = get_gpu_info()
+        cuda_info = get_gpu_info()
     except pynvml.NVMLError_LibraryNotFound:  # type: ignore
         logger.warning("NVIDIA driver not found")
-        gpus = {}
+        cuda_info = {}
     if hasattr(psutil, "cpu_freq") and psutil.cpu_freq() is not None:
         cpufreq = psutil.cpu_freq().max
     else:
@@ -106,5 +114,5 @@ def get_system_info() -> dict[str, Any]:
             "frequency": f"{(cpufreq / 1000):.2f} GHz",
         },
         "memory": format_num(svmem.total, bytes=True),
-        "gpus": gpus,
+        "cuda": cuda_info,
     }

@@ -66,7 +66,7 @@ def test_print_system_info_no_gpus(mock_console):
     system_info = {
         "os": {"system": "Linux", "node": "test", "release": "6.0", "version": "#1"},
         "cpu": {"model": "TestCPU", "architecture": "x86_64", "cores": {"physical": 4, "total": 8}},
-        "gpus": [],
+        "cuda": {},
     }
     print_system_info(system_info)
     mock_console.print.assert_called_once()

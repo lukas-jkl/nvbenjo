@@ -80,9 +80,11 @@ def print_system_info(system_info: dict):
     os_info = system_info["os"]
     os_string = os_info["system"].replace("Linux", "Linux 🐧")
     cpu_info = system_info["cpu"]
-    gpu_infos = system_info["gpus"]
-    driver_version = set(gpu_info["driver"] for gpu_info in gpu_infos)
-    driver_version = driver_version.pop() if len(driver_version) == 1 else driver_version
+    cuda_info = system_info["cuda"]
+    gpu_infos = cuda_info.get("gpus", [])
+    driver_version = cuda_info.get("driver_version", "None")
+    cudnn_version = cuda_info.get("cudnn_version", "None")
+    torch_version = cuda_info.get("torch_version", "None")
 
     title = Text("System Information", style="bold cyan")
 
@@ -98,12 +100,12 @@ def print_system_info(system_info: dict):
 
     content.append("GPUs", style="bold green")
     if len(gpu_infos) > 0:
-        content.append(f" (Driver {driver_version})\n", style="green")
+        content.append(f" (Driver {driver_version}, Torch {torch_version}, CuDNN {cudnn_version})\n", style="green")
         for gpu_info in gpu_infos:
             content.append("   ", style="bold blue")
             content.append(f"{gpu_info['name']} @ {gpu_info['clock_gpu']} ", style=text_color)
             content.append(f"({gpu_info['memory']} @ {gpu_info['clock_mem']})", style=text_color)
-            content.append(f" - {gpu_info['architecture']}\n", style=text_color)
+            content.append(f" - {gpu_info['architecture']} cap {gpu_info['cuda_capability']}\n", style=text_color)
     else:
         content.append("  None\n", style=text_color)
 
