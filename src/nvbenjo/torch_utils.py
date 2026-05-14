@@ -482,13 +482,13 @@ def _copy_into(dst: TensorLike, src: TensorLike) -> None:
             raise ValueError(f"Type mismatch copying into graph buffer: {type(dst)} vs {type(src)}")
         dst.copy_(src, non_blocking=True)
         return
-    if isinstance(dst, (list, tuple)):
+    if isinstance(dst, (list, tuple)) and isinstance(src, (list, tuple)):
         for d, s in zip(dst, src):
             _copy_into(d, s)
         return
-    if isinstance(dst, dict):
+    if isinstance(dst, dict) and isinstance(src, dict):
         for k, d in dst.items():
-            _copy_into(d, src[k])
+            _copy_into(d, src[k])  # type: ignore[index]
         return
     raise ValueError(f"Unsupported batch type for CUDA graph copy: {type(dst)}")
 
