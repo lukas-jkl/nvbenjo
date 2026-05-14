@@ -425,7 +425,9 @@ def benchmark_model(
                         device=device,
                         num_batches=model_cfg.num_batches,
                         progress_bar=progress_bar,
-                        timing_function=functools.partial(torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn),
+                        timing_function=functools.partial(
+                            torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn
+                        ),
                     )
                     if profiler is not None:
                         profiler.stop()

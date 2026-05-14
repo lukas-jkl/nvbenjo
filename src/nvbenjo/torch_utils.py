@@ -471,9 +471,9 @@ def _aot_compile_or_load(
             package_path = torch._inductor.aoti_compile_and_package(program, **compile_kwargs)
         return torch._inductor.aoti_load_package(package_path)
 
+
 def _copy_into(dst: TensorLike, src: TensorLike) -> None:
-    """In-place copy ``src`` into ``dst`` matching nested structure.
-    """
+    """In-place copy ``src`` into ``dst`` matching nested structure."""
     if dst is src:
         # no cost if already moved
         return
