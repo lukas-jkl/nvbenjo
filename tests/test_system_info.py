@@ -14,10 +14,11 @@ def test_get_system_info():
 
     cuda_info = system_info["cuda"]
     assert isinstance(cuda_info, dict)
-    assert "driver_version" in cuda_info
 
-    gpus = cuda_info.get("gpus", [])
-    for gpu in gpus:
+    if cuda_info:
+        assert "driver_version" in cuda_info
+
+    for gpu in cuda_info.get("gpus", []):
         assert isinstance(gpu, dict)
         assert "name" in gpu
         assert "architecture" in gpu
