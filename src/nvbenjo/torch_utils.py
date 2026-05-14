@@ -470,3 +470,106 @@ def _aot_compile_or_load(
         with progress_task(progress_bar, "    AOT compiling...", total=None):
             package_path = torch._inductor.aoti_compile_and_package(program, **compile_kwargs)
         return torch._inductor.aoti_load_package(package_path)
+
+def _copy_into(dst: TensorLike, src: TensorLike) -> None:
+    """In-place copy ``src`` into ``dst`` matching nested structure.
+    """
+    if dst is src:
+        # no cost if already moved
+        return
+    if isinstance(dst, torch.Tensor):
+        if not isinstance(src, torch.Tensor):
+            raise ValueError(f"Type mismatch copying into graph buffer: {type(dst)} vs {type(src)}")
+        dst.copy_(src, non_blocking=True)
+        return
+    if isinstance(dst, (list, tuple)):
+        for d, s in zip(dst, src):
+            _copy_into(d, s)
+        return
+    if isinstance(dst, dict):
+        for k, d in dst.items():
+            _copy_into(d, src[k])
+        return
+    raise ValueError(f"Unsupported batch type for CUDA graph copy: {type(dst)}")
+
+
+class _CudaGraphedModel:
+    """Callable that copies inputs into captured buffers and replays a CUDA graph.
+
+    The captured ``torch.cuda.CUDAGraph`` records device pointers for ``static_input``
+    and ``static_output``; this wrapper bundles all three so the graph stays valid
+    (replaying after the buffers are freed is undefined behavior).
+    """
+
+    def __init__(
+        self,
+        graph: "torch.cuda.CUDAGraph",
+        static_input: TensorLike,
+        static_output: ty.Any,
+        device: torch.device,
+    ):
+        self.graph = graph
+        self.static_input = static_input
+        self.static_output = static_output
+        self.device = device
+        if isinstance(static_input, dict):
+            self._pick_src = lambda args, kwargs: kwargs
+        elif isinstance(static_input, (list, tuple)):
+            self._pick_src = lambda args, kwargs: args
+        else:
+            self._pick_src = lambda args, kwargs: args[0]
+
+    def __call__(self, *args, **kwargs) -> ty.Any:
+        _copy_into(self.static_input, self._pick_src(args, kwargs))
+        self.graph.replay()
+        return self.static_output
+
+    def transfer_to_device(self, x: ty.Any, to_device: torch.device) -> ty.Any:
+        """Drop-in replacement for ``transfer_to_device`` for use in the timing loop.
+
+        For CPU→graph-device, copies into ``static_input`` and synchronizes so the
+        cost is reflected in ``time_cpu_to_device``. For the reverse direction
+        (e.g., GPU→CPU output transfer), falls back to the regular transfer.
+        """
+        if to_device == self.device:
+            _copy_into(self.static_input, x)
+            torch.cuda.synchronize(self.device)
+            return self.static_input
+        return transfer_to_device(x, to_device)
+
+
+def _cuda_graph_capture(
+    model: nn.Module | Callable,
+    batch: TensorLike,
+    device: torch.device,
+    num_warmup_iters: int,
+    capture_kwargs: Optional[dict] = None,
+    progress_bar: Optional[Progress] = None,
+) -> _CudaGraphedModel:
+    """Capture ``model(batch)`` as a CUDA graph and return a copy-replay callable.
+
+    Performs ``num_warmup_iters`` warmup iterations on a side stream before capture
+    so cuDNN autotune and lazy allocations settle, then captures one graph keyed
+    by the structure/dtype/shape of ``batch``.
+    """
+    if device.type != "cuda":
+        raise ValueError(f"_graph_capture requires a CUDA device, got {device}")
+
+    static_input = transfer_to_device(batch, device)
+
+    with progress_task(progress_bar, "    CUDA graph warm-up", total=num_warmup_iters) as task:
+        s = torch.cuda.Stream(device=device)
+        s.wait_stream(torch.cuda.current_stream(device))
+        with torch.cuda.stream(s):
+            for _ in range(num_warmup_iters):
+                static_output = run_model_with_input(model, static_input)
+                if progress_bar is not None and task is not None:
+                    progress_bar.advance(task)
+        torch.cuda.current_stream(device).wait_stream(s)
+
+    with progress_task(progress_bar, "    CUDA graph capture", total=None):
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph, **(capture_kwargs or {})):
+            static_output = run_model_with_input(model, static_input)
+
+    return _CudaGraphedModel(graph, static_input, static_output, device)
