@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from nvbenjo.plot import print_system_info, visualize_results
+from nvbenjo.plot import print_results, print_system_info, visualize_results
 
 
 @pytest.fixture
@@ -70,3 +70,27 @@ def test_print_system_info_no_gpus(mock_console):
     }
     print_system_info(system_info)
     mock_console.print.assert_called_once()
+
+
+@patch("nvbenjo.plot.console")
+def test_print_results_custom_metric_missing_for_some_runs(mock_console):
+    """When custom_metric_keys column has values for some models but not others, summary table falls back to default."""
+    results = pd.DataFrame(
+        {
+            "model": ["m1", "m1", "m2", "m2"],
+            "device": ["cpu", "cpu", "cpu", "cpu"],
+            "batch_size": [1, 1, 1, 1],
+            "runtime_options": ["opt1", "opt2", "opt1", "opt2"],
+            "time_total_batch_normalized": [0.1, 0.2, 0.3, 0.4],
+            "memory_bytes": [1000, 2000, 3000, 4000],
+            "custom_accuracy": [0.9, 0.8, None, None],
+        }
+    )
+    # m2 has no custom_accuracy values → summary table should use default metric entirely, not mix
+    print_results(results, custom_metric_keys=["custom_accuracy"])
+    # Verify the summary table uses "Time Batch Normalized" as the column header, not "custom_accuracy"
+    summary_call = mock_console.print.call_args_list[-1]
+    panel = summary_call[0][0]
+    column_headers = [col.header for col in panel.renderable.columns]
+    assert "Time Batch Normalized" in column_headers
+    assert "custom_accuracy" not in column_headers
