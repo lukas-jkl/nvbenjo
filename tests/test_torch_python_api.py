@@ -100,3 +100,26 @@ def test_aot_cache_skips_recompile(tmp_path):
     # Different batch_size → different key → second cache file appears
     benchmark.benchmark_models({"model_1": make_cfg(2)})
     assert len(os.listdir(cache_dir)) == 2
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA Graphs require a CUDA device")
+def test_cuda_graph():
+    num_batches = 1
+    model_cfg = cfg.TorchModelConfig(
+        name="cuda-graphs-tiny",
+        type_or_path="torchvision:shufflenet_v2_x0_5",
+        shape=(("B", 3, 224, 224),),
+        devices=["cuda"],
+        batch_sizes=[1],
+        num_warmup_batches=1,
+        num_batches=num_batches,
+        runtime_options={
+            "eager": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32),
+            "graphed": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32, cuda_graphs=True),
+        },
+    )
+    results = benchmark.benchmark_models({"model_1": model_cfg})
+    assert not results.empty
+    runtimes = set(results.runtime_options.to_numpy())
+    assert {"eager", "graphed"}.issubset(runtimes)
+    assert len(results[results.runtime_options == "graphed"]) == num_batches
