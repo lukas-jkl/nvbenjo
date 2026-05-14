@@ -119,6 +119,12 @@ class TorchRuntimeConfig:
         Additional keyword arguments passed to ``torch.compile`` or ``aoti_compile_and_package``.
     precision : PrecisionType
         Precision type for model inference (e.g., fp32, fp16, amp).
+    cuda_graphs : bool
+        Wrap inference in a CUDA Graph capture/replay. Eliminates per-launch CPU
+        dispatch overhead at the cost of one captured graph per
+        (model, batch_size, shape, dtype). Requires a CUDA device; ignored on CPU.
+    cuda_graph_kwargs : dict
+        Additional keyword arguments passed to ``torch.cuda.graph``
     enable_profiling : bool
         Whether to enable PyTorch profiler during inference.
     profiling_prefix : str or None
@@ -138,6 +144,8 @@ class TorchRuntimeConfig:
     compile: str = "False"
     compile_kwargs: dict = field(default_factory=dict)
     precision: PrecisionType = PrecisionType.FP32
+    cuda_graphs: bool = False
+    cuda_graph_kwargs: dict = field(default_factory=dict)
     enable_profiling: bool = False
     profiling_prefix: ty.Optional[str] = None
     profiler_kwargs: dict = field(default_factory=dict)

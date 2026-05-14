@@ -1,6 +1,7 @@
 import itertools
 import logging
 import time
+import functools
 import typing as ty
 from typing import Any, Callable, Optional, Dict
 
@@ -382,7 +383,17 @@ def benchmark_model(
                         raise ValueError(f"Unknown compile mode {runtime_cfg._compile_mode}")
 
                 with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
-                    _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
+                    if runtime_cfg.cuda_graphs and device.type == "cuda":
+                        model = torch_utils._cuda_graph_capture(
+                            model,
+                            batch,
+                            device,
+                            num_warmup_iters=model_cfg.num_warmup_batches,
+                            capture_kwargs=runtime_cfg.cuda_graph_kwargs,
+                            progress_bar=progress_bar,
+                        )
+                    else:
+                        _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
                     if measure_memory:
                         memory_alloc = torch_utils.measure_memory_allocation(model, batch, device)
                     else:
@@ -403,6 +414,10 @@ def benchmark_model(
                         profiler.start()
                     else:
                         profiler = None
+                    if isinstance(model, torch_utils._CudaGraphedModel):
+                        transfer_fn = model.transfer_to_device
+                    else:
+                        transfer_fn = torch_utils.transfer_to_device
                     cur_results = _measure_timings(
                         model=model,
                         batch=batch,
@@ -410,7 +425,9 @@ def benchmark_model(
                         device=device,
                         num_batches=model_cfg.num_batches,
                         progress_bar=progress_bar,
-                        timing_function=torch_utils.measure_repeated_inference_timing,
+                        timing_function=functools.partial(
+                            torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn
+                        ),
                     )
                     if profiler is not None:
                         profiler.stop()

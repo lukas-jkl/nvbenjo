@@ -20,7 +20,18 @@ nvbenjo:
         torch_compile:
           precision: AMP_BFLOAT16
           compile: torch_compile
-        # Ahead-of-time compilation (AMP is not supported for AOT)
+        # torch.compile + CUDA graphs
+        torch_compile_graphed:
+          precision: AMP_BFLOAT16
+          compile: torch_compile
+          cuda_graphs: true
+        # Ahead-of-time compilation
         aot_compile:
           precision: BFLOAT16
           compile: aot_compile
+          cuda_graphs: false
+        # AOT compilation + CUDA graphs
+        aot_compile_graphed:
+          precision: BFLOAT16
+          compile: aot_compile
+          cuda_graphs: true
