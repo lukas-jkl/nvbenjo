@@ -14,22 +14,15 @@
    :caption: Example Configuration
 ```
 
-## Onnx
-
-```{eval-rst}
-.. literalinclude:: ../src/nvbenjo/conf/onnx.yaml
-   :language: yaml
-   :caption: Example Configuration of Onnx Model
-```
-
-```{eval-rst}
-.. literalinclude:: ../src/nvbenjo/conf/onnxsilero.yaml
-   :language: yaml
-   :caption: Example Configuration of Onnx-Silero Model
-```
-
-
 ## PyTorch
+
+### Compilation & CUDA Graphs
+
+```{eval-rst}
+.. literalinclude:: ../src/nvbenjo/conf/compile_example.yaml
+   :language: yaml
+   :caption: Example Configuration with torch.compile, AOT compilation and CUDA Graphs
+```
 
 ### Torchvision
 
@@ -47,12 +40,18 @@
    :caption: Example Configuration of Huggingface Models
 ```
 
-### Compilation (torch.compile & AOT)
+## Onnx
 
 ```{eval-rst}
-.. literalinclude:: ../src/nvbenjo/conf/compile_example.yaml
+.. literalinclude:: ../src/nvbenjo/conf/onnx.yaml
    :language: yaml
-   :caption: Example Configuration with torch.compile and AOT compilation
+   :caption: Example Configuration of Onnx Model
+```
+
+```{eval-rst}
+.. literalinclude:: ../src/nvbenjo/conf/onnxsilero.yaml
+   :language: yaml
+   :caption: Example Configuration of Onnx-Silero Model
 ```
 
 ## Advanced Examples
