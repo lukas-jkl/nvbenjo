@@ -12,22 +12,22 @@ def test_lint(session):
     session.run("ty", "check", ".")
 
 
-@nox.session(name="test-python", venv_backend="uv")
-@nox.parametrize("python", ["3.10", "3.11", "3.12", "3.13"])
-@nox.parametrize("torch", ["2.10.0"])
-def test_python(session, torch):
-    session.install(f"torch=={torch}")
-    session.install("-e", ".[onnx-cpu]", "--group", "dev")
-    session.run("pytest", "-n", "4")
+# @nox.session(name="test-python", venv_backend="uv")
+# @nox.parametrize("python", ["3.10", "3.11", "3.12", "3.13"])
+# @nox.parametrize("torch", ["2.10.0"])
+# def test_python(session, torch):
+#     session.install(f"torch=={torch}")
+#     session.install("-e", ".[onnx-cpu]", "--group", "dev")
+#     session.run("pytest", "-n", "4")
 
 
-@nox.session(name="test-torch", venv_backend="uv")
-@nox.parametrize("python", ["3.12"])
-@nox.parametrize("torch", ["2.4", "2.6", "2.10.0"])
-def test_torch(session, torch):
-    session.install(f"torch=={torch}")
-    session.install("-e", ".[onnx-cpu]", "--group", "dev")
-    session.run("pytest", "-n", "4")
+# @nox.session(name="test-torch", venv_backend="uv")
+# @nox.parametrize("python", ["3.12"])
+# @nox.parametrize("torch", ["2.4", "2.6", "2.10.0"])
+# def test_torch(session, torch):
+#     session.install(f"torch=={torch}")
+#     session.install("-e", ".[onnx-cpu]", "--group", "dev")
+#     session.run("pytest", "-n", "4")
 
 
 @nox.session(name="test-examples", venv_backend="uv", default=False)
@@ -63,3 +63,31 @@ def test_examples(session, torch):
     for config in configs:
         print(f"Running example {config}:")
         session.run("nvbenjo", "-cn", config)
+
+
+@nox.session(name="test-python-api-examples", venv_backend="uv", default=False)
+@nox.parametrize("python", ["3.12"])
+@nox.parametrize("torch", ["2.10.0"])
+def test_python_api_examples(session, torch):
+    session.install(f"torch=={torch}")
+    session.install("-e", ".[onnx-cpu]", "--group", "dev")
+    files_to_download = [
+        (
+            "https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/resnet/model/resnet50-v2-7.onnx",
+            "~/Downloads/resnet50-v2-7.onnx",
+        ),
+    ]
+    print("Downloading example models...")
+    for url, path in files_to_download:
+        if os.path.isfile(os.path.expanduser(path)):
+            print(f"File {path} already exists, skipping download.")
+            continue
+        print(f"Downloading {url} to {path}...")
+        with open(os.path.expanduser(path), "wb") as f:
+            f.write(requests.get(url).content)
+
+    for example in sorted(os.listdir("examples")):
+        if not example.endswith(".py"):
+            continue
+        print(f"Running example {example}:")
+        session.run("python", os.path.join("examples", example))

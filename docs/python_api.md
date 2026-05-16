@@ -35,3 +35,21 @@
 
 .. autofunction:: nvbenjo.system_info.get_gpu_info
 ```
+
+## Examples
+
+### PyTorch
+
+```{eval-rst}
+.. literalinclude:: ../examples/basic_torch.py
+   :language: python
+   :caption: Basic PyTorch benchmark
+```
+
+### ONNX
+
+```{eval-rst}
+.. literalinclude:: ../examples/basic_onnx.py
+   :language: python
+   :caption: Basic ONNX benchmark
+```

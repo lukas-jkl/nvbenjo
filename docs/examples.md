@@ -1,4 +1,4 @@
-# Examples
+# CLI Examples
 
 ```{eval-rst}
 .. literalinclude:: ../src/nvbenjo/conf/small.yaml
