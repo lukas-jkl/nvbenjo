@@ -40,7 +40,7 @@ nvbenjo:
     silero:
       type_or_path: ~/Downloads/silero_model_stt_v5.onnx
       shape:
-        - {name: "input", shape: [B, 512], "type": "float", min_max: [0, 1]}
+        - {name: "input", shape: [B, 16000], "type": "float", min_max: [-1, 1]}
       num_warmup_batches: 5
       num_batches: 20
       batch_sizes: [1, 2]
