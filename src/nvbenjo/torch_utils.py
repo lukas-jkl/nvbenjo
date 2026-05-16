@@ -28,6 +28,7 @@ from rich.progress import Progress
 from nvbenjo import console
 from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
 from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task, sample_gpu_memory
+from nvbenjo.torch_ops import *  # noqa: F403
 
 logger = logging.getLogger(__name__)
 
