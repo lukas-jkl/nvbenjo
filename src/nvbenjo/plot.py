@@ -264,12 +264,17 @@ def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, d
 def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: List):
     default_metric = "time_total_batch_normalized"
     default_metric_title = "Time Batch Normalized"
-    if not custom_metric_keys:
-        first_metric = default_metric
-        metric_title = default_metric_title
-    else:
+    has_custom_metric = (
+        custom_metric_keys
+        and custom_metric_keys[0] in results.columns
+        and not results[custom_metric_keys[0]].isnull().any()
+    )
+    if has_custom_metric:
         first_metric = custom_metric_keys[0]
         metric_title = first_metric
+    else:
+        first_metric = default_metric
+        metric_title = default_metric_title
 
     table = Table(
         show_header=True,
