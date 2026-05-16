@@ -82,7 +82,7 @@ def test_print_results_custom_metric_missing_for_some_runs(mock_console):
             "batch_size": [1, 1, 1, 1],
             "runtime_options": ["opt1", "opt2", "opt1", "opt2"],
             "time_total_batch_normalized": [0.1, 0.2, 0.3, 0.4],
-            "memory_bytes": [1000, 2000, 3000, 4000],
+            "gpu_memory_bytes": [1000, 2000, 3000, 4000],
             "custom_accuracy": [0.9, 0.8, None, None],
         }
     )
