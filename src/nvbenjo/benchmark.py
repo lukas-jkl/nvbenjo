@@ -395,9 +395,12 @@ def benchmark_model(
                     else:
                         _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
                     if measure_memory:
-                        memory_alloc = torch_utils.measure_memory_allocation(model, batch, device)
+                        torch_memory_alloc, gpu_memory_alloc = torch_utils.measure_gpu_memory_allocation(
+                            model, batch, device
+                        )
                     else:
-                        memory_alloc = 0
+                        torch_memory_alloc = 0
+                        gpu_memory_alloc = 0
                     if runtime_cfg.enable_profiling:
                         if "activities" not in runtime_cfg.profiler_kwargs:
                             runtime_cfg.profiler_kwargs["activities"] = (
@@ -440,13 +443,13 @@ def benchmark_model(
 
                 batch = onnx_utils.get_rnd_input_batch(model.get_inputs(), model_cfg.shape, batch_size)
 
-                memory_alloc = 0
                 num_model_parameters = 0
                 set_dtype = False
+                torch_memory_alloc = None  # no memory allocation can be measured for onnx
                 if measure_memory:
-                    memory_alloc = onnx_utils.measure_memory_allocation(model, batch, device)
+                    gpu_memory_alloc = onnx_utils.measure_gpu_memory_allocation(model, batch, device)
                 else:
-                    memory_alloc = 0
+                    gpu_memory_alloc = 0
                 cur_results = _measure_timings(
                     model,
                     batch,
@@ -463,7 +466,8 @@ def benchmark_model(
             del batch
             torch.cuda.empty_cache()
 
-            cur_results["memory_bytes"] = memory_alloc
+            cur_results["torch_memory_bytes"] = torch_memory_alloc
+            cur_results["gpu_memory_bytes"] = gpu_memory_alloc
             cur_results["model"] = model_cfg.name
             cur_results["batch_size"] = batch_size
             cur_results["runtime_options"] = runtime_option_name

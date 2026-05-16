@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+import threading
+import time
 from contextlib import contextmanager
 import typing as ty
 import pandas as pd
+import pynvml
 from enum import Enum
 from omegaconf.listconfig import ListConfig
 from omegaconf.dictconfig import DictConfig
@@ -214,3 +218,29 @@ def progress_task(progress: ty.Optional[Progress], task_name: str, **kwargs):
             yield task
         finally:
             progress.remove_task(task)
+
+
+def sample_gpu_memory(
+    device: torch.device, stop_event: threading.Event, max_mem: list[int], sample_time_s: float = 0.010
+):
+    """Sample process-level GPU memory in a loop until stop_event is set.
+
+    Uses pynvml to read per-process GPU memory, capturing all allocations
+    including CUDA context, graph memory, compiled kernels, etc.
+    """
+    if device.type != "cuda":
+        max_mem[0] = -1
+        return
+
+    pynvml.nvmlInit()
+    handle = pynvml.nvmlDeviceGetHandleByIndex(device.index if device.index is not None else 0)
+    pid = os.getpid()
+
+    while not stop_event.is_set():
+        for proc in pynvml.nvmlDeviceGetComputeRunningProcesses(handle):
+            if proc.pid == pid:
+                mem = proc.usedGpuMemory
+                if isinstance(mem, int) and mem > max_mem[0]:
+                    max_mem[0] = mem
+                break
+        time.sleep(sample_time_s)

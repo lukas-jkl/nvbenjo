@@ -1,10 +1,10 @@
 import os
 import time
-import nvitop
 import threading
 import typing as ty
 
 from .cfg import OnnxRuntimeConfig
+from .utils import sample_gpu_memory
 
 try:
     import onnxruntime as ort
@@ -89,22 +89,7 @@ def get_model(
     return sess
 
 
-def _sample_gpu_memory(
-    device: torch.device, stop_event: threading.Event, max_mem: list[int], sample_time_s: float = 0.010
-):
-    if device.type == "cuda":
-        gpu = nvitop.Device(device.index)
-    else:
-        max_mem[0] = 1
-    while not stop_event.is_set():
-        if device.type == "cuda":
-            mem = gpu.memory_used()
-            if isinstance(mem, int) and mem > max_mem[0]:
-                max_mem[0] = mem
-        time.sleep(sample_time_s)
-
-
-def measure_memory_allocation(
+def measure_gpu_memory_allocation(
     model: ort.InferenceSession, sample: dict[str, torch.Tensor], device: torch.device, iterations: int = 3
 ) -> int:
     """Measure the memory usage during inference
@@ -129,7 +114,7 @@ def measure_memory_allocation(
     stop_event = threading.Event()
 
     # Start memory sampling thread so we can measure peak memory usage in parallel
-    sampler = threading.Thread(target=_sample_gpu_memory, args=(device, stop_event, max_mem))
+    sampler = threading.Thread(target=sample_gpu_memory, args=(device, stop_event, max_mem))
     sampler.start()
     time.sleep(0.01)  # give sampler some time to start
 
@@ -141,7 +126,7 @@ def measure_memory_allocation(
         sampler.join()
 
     max_mem = max_mem[0]
-    if max_mem == -1:
+    if max_mem == -1 and device.type != "cpu":
         raise RuntimeError("Memory measurement failed!")
 
     return max_mem

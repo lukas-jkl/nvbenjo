@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import typing as ty
 from collections.abc import Sequence
@@ -26,7 +27,7 @@ from rich.progress import Progress
 
 from nvbenjo import console
 from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
-from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task
+from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task, sample_gpu_memory
 
 logger = logging.getLogger(__name__)
 
@@ -227,10 +228,13 @@ def get_model_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
-def measure_memory_allocation(
+def measure_gpu_memory_allocation(
     model: nn.Module | Callable, batch: TensorLike, device: torch.device, iterations: int = 3
-) -> int:
-    """Measure the peak memory usage during inference
+) -> tuple[int, int]:
+    """Measure peak memory usage during inference.
+
+    Returns both the PyTorch allocator peak (via torch.cuda.max_memory_allocated)
+    and the process-level GPU memory peak (via pynvml sampling).
 
     Parameters
     ----------
@@ -245,31 +249,45 @@ def measure_memory_allocation(
 
     Returns
     -------
-    int
-        Maximum memory allocated during inference in bytes.
+    tuple[int, int]
+        (torch_memory_bytes, gpu_memory_bytes) — PyTorch allocator peak and
+        process-level GPU memory peak.
     """
-    if device.type == "cuda":
+    is_cuda = device.type == "cuda"
+
+    if is_cuda:
         torch.cuda.reset_peak_memory_stats(device=device)
-    # before_run_allocation = torch.cuda.memory_allocated(device=device)
+        max_mem = [-1]
+        stop_event = threading.Event()
+        sampler = threading.Thread(target=sample_gpu_memory, args=(device, stop_event, max_mem))
+        sampler.start()
+        time.sleep(0.01)
 
     batch = transfer_to_device(batch, to_device=device)
     if isinstance(model, nn.Module):
         model = model.to(device)
-    for _ in range(iterations):
-        r = run_model_with_input(model, batch)
+
     try:
-        _ = transfer_to_device(r, to_device=torch.device("cpu"))
-    except Exception:
-        console.print(TRANSFER_WARNING)
+        for _ in range(iterations):
+            r = run_model_with_input(model, batch)
+        try:
+            _ = transfer_to_device(r, to_device=torch.device("cpu"))
+        except Exception:
+            console.print(TRANSFER_WARNING)
+    finally:
+        if is_cuda:
+            stop_event.set()
+            sampler.join()
 
-    if device.type == "cuda":
+    if is_cuda:
         logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
-        # after_batch_allocation = torch.cuda.memory_allocated(device=device)
-        max_batch_allocation = torch.cuda.max_memory_allocated(device=device)
+        torch_memory = torch.cuda.max_memory_allocated(device=device)
+        gpu_memory = max_mem[0]
     else:
-        max_batch_allocation = -1
+        torch_memory = -1
+        gpu_memory = -1
 
-    return max_batch_allocation
+    return torch_memory, gpu_memory
 
 
 def measure_repeated_inference_timing(
