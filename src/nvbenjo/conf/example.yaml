@@ -25,7 +25,7 @@ nvbenjo:
           matmul_precision: highest
         run_FP16_compiled:
           compile: torch_compile
-          cuda_graphs: true
+          cuda_graphs: false
           precision: fp16
         run_FP32_profiled:
           precision: FP32
