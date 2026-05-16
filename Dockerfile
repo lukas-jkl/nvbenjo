@@ -14,7 +14,7 @@ RUN mkdir build && cd build && cmake .. && make
 ENV PATH="/nvbandwidth/build:$PATH"
 
 # get uv
-COPY --from=ghcr.io/astral-sh/uv:0.6.14 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.14 /uv /uvx /bin/
 ENV PATH="/root/.local/bin:${PATH}"
 
 # install nvbenjo
