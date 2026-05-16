@@ -173,6 +173,10 @@ def apply_batch_precision(batch: TensorLike, precision: PrecisionType) -> Tensor
                 batch_tensor = batch_tensor.half()
             elif precision == PrecisionType.BFLOAT16:
                 batch_tensor = batch_tensor.bfloat16()
+            elif precision == PrecisionType.FP8_E4M3FN:
+                batch_tensor = batch_tensor.to(torch.float8_e4m3fn)
+            elif precision == PrecisionType.FP8_E5M2:
+                batch_tensor = batch_tensor.to(torch.float8_e5m2)
             else:
                 if precision != PrecisionType.FP32:
                     raise ValueError(f"Invalid precision type {precision}.")
@@ -199,6 +203,10 @@ def apply_non_amp_model_precision(
             model = model.half()
         elif precision == PrecisionType.BFLOAT16:
             model = model.bfloat16()
+        elif precision == PrecisionType.FP8_E4M3FN:
+            model = model.to(torch.float8_e4m3fn)
+        elif precision == PrecisionType.FP8_E5M2:
+            model = model.to(torch.float8_e5m2)
         else:
             if precision != PrecisionType.FP32:
                 raise ValueError(f"Invalid precision type {precision}.")

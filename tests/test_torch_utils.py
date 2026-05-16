@@ -68,6 +68,40 @@ def test_apply_non_amp_model_precision():
     assert batch.dtype == torch.float32
 
 
+@pytest.mark.parametrize(
+    "precision,expected_dtype",
+    [
+        (PrecisionType.FP16, torch.float16),
+        (PrecisionType.BFLOAT16, torch.bfloat16),
+        pytest.param(
+            PrecisionType.FP8_E4M3FN,
+            getattr(torch, "float8_e4m3fn", None),
+            marks=pytest.mark.skipif(not hasattr(torch, "float8_e4m3fn"), reason="requires PyTorch >= 2.1"),
+        ),
+        pytest.param(
+            PrecisionType.FP8_E5M2,
+            getattr(torch, "float8_e5m2", None),
+            marks=pytest.mark.skipif(not hasattr(torch, "float8_e5m2"), reason="requires PyTorch >= 2.1"),
+        ),
+    ],
+)
+def test_apply_precision(precision, expected_dtype):
+    class SimpleModel(nn.Module):
+        def __init__(self):
+            super(SimpleModel, self).__init__()
+            self.fc = nn.Linear(10, 10, bias=False)
+
+        def forward(self, x):
+            return self.fc(x)
+
+    model = SimpleModel()
+    batch = torch.randn(10, 10)
+    model = apply_non_amp_model_precision(model, precision)
+    batch = apply_batch_precision(batch, precision)
+    assert model.fc.weight.dtype == expected_dtype
+    assert batch.dtype == expected_dtype
+
+
 def test_get_amp_ctxt_for_precision():
     ctxt = get_amp_ctxt_for_precision(PrecisionType.AMP, torch.device("cpu"))
     assert isinstance(ctxt, torch.autocast)

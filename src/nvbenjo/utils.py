@@ -50,6 +50,8 @@ class PrecisionType(Enum):
     FP32 = "fp32"
     FP16 = "fp16"
     BFLOAT16 = "bfloat16"
+    FP8_E4M3FN = "fp8_e4m3fn"
+    FP8_E5M2 = "fp8_e5m2"
     LONG = "long"
 
 
