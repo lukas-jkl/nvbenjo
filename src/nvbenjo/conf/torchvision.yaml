@@ -24,10 +24,14 @@ nvbenjo:
         shape: [B, 3, 224, 224]
         num_warmup_batches: 5
         num_batches: 10
-        batch_sizes: [1, 8, 16]
+        batch_sizes: [16]
         devices: ["cuda:0"]
         runtime_options:
-          FP32:
+          FP32_highest:
+            matmul_precision: highest
+            precision: FP32
+          FP32_medium:
+            matmul_precision: medium
             precision: FP32
           AMP_FP16:
             precision: AMP_FP16

@@ -386,7 +386,10 @@ def benchmark_model(
                     else:
                         raise ValueError(f"Unknown compile mode {runtime_cfg._compile_mode}")
 
-                with torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device):
+                with (
+                    torch_utils.get_amp_ctxt_for_precision(precision=runtime_cfg.precision, device=device),
+                    torch_utils.matmul_precision_ctxt(runtime_cfg.matmul_precision),
+                ):
                     if runtime_cfg.cuda_graphs and device.type == "cuda":
                         model = torch_utils._cuda_graph_capture(
                             model,
