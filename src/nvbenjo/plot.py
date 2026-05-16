@@ -11,8 +11,66 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from rich.measure import Measurement
+from rich.console import Console, ConsoleOptions, RenderResult
+
 from . import console
 from .utils import format_num, format_seconds
+
+
+class MemoryBar:
+    """A composite bar showing torch allocator memory (red) and remaining process memory (white)."""
+
+    FULL_BLOCK = "█"
+
+    def __init__(self, torch_mem: float, gpu_mem: float, max_mem: float, width: int = 80):
+        self.torch_mem = torch_mem
+        self.gpu_mem = gpu_mem
+        self.max_mem = max_mem
+        self.width = width
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        width = min(self.width, options.max_width)
+        if self.max_mem <= 0:
+            yield Text(" " * width)
+            return
+        gpu_chars = round(self.gpu_mem / self.max_mem * width)
+        # If torch_mem == gpu_mem show all as white
+        if self.torch_mem < self.gpu_mem:
+            torch_chars = round(self.torch_mem / self.max_mem * width)
+        else:
+            torch_chars = 0
+        grey_chars = gpu_chars - torch_chars
+        empty_chars = width - gpu_chars
+
+        bar = Text()
+        if torch_chars > 0:
+            bar.append(self.FULL_BLOCK * torch_chars, style="red")
+        if grey_chars > 0:
+            bar.append(self.FULL_BLOCK * grey_chars, style="bright_white")
+        if empty_chars > 0:
+            bar.append(" " * empty_chars)
+        yield bar
+
+    def __rich_measure__(self, console: Console, options: ConsoleOptions) -> Measurement:
+        return Measurement(1, self.width)
+
+
+def _format_memory_label(torch_mem: float, gpu_mem: float) -> Text:
+    """Format memory label: 'torch_val (gpu_val)' with red/white styling, or just white if equal."""
+    label = Text()
+    if torch_mem < gpu_mem:
+        label.append(str(format_num(torch_mem, bytes=True)), style="red")
+        label.append(f" ({format_num(gpu_mem, bytes=True)})", style="bright_white")
+    else:
+        label.append(str(format_num(gpu_mem, bytes=True)), style="bright_white")
+    return label
+
+
+def _has_mem(results: pd.Series | pd.DataFrame, key: str):
+    if isinstance(results, pd.Series):
+        return key in results.index and not pd.isnull(results[key])
+    return key in results.columns and not results[key].isnull().all()
 
 
 def visualize_results(
@@ -23,7 +81,8 @@ def visualize_results(
         "time_device_to_cpu",
         "time_inference",
         "time_total_batch_normalized",
-        "memory_bytes",
+        "torch_memory_bytes",
+        "gpu_memory_bytes",
     ],
     hue="runtime_options",
     col="batch_size",
@@ -80,9 +139,11 @@ def print_system_info(system_info: dict):
     os_info = system_info["os"]
     os_string = os_info["system"].replace("Linux", "Linux 🐧")
     cpu_info = system_info["cpu"]
-    gpu_infos = system_info["gpus"]
-    driver_version = set(gpu_info["driver"] for gpu_info in gpu_infos)
-    driver_version = driver_version.pop() if len(driver_version) == 1 else driver_version
+    cuda_info = system_info["cuda"]
+    gpu_infos = cuda_info.get("gpus", [])
+    driver_version = cuda_info.get("driver_version", "None")
+    cudnn_version = cuda_info.get("cudnn_version", "None")
+    torch_version = cuda_info.get("torch_version", "None")
 
     title = Text("System Information", style="bold cyan")
 
@@ -98,12 +159,12 @@ def print_system_info(system_info: dict):
 
     content.append("GPUs", style="bold green")
     if len(gpu_infos) > 0:
-        content.append(f" (Driver {driver_version})\n", style="green")
+        content.append(f" (Driver {driver_version}, Torch {torch_version}, CuDNN {cudnn_version})\n", style="green")
         for gpu_info in gpu_infos:
             content.append("   ", style="bold blue")
             content.append(f"{gpu_info['name']} @ {gpu_info['clock_gpu']} ", style=text_color)
             content.append(f"({gpu_info['memory']} @ {gpu_info['clock_mem']})", style=text_color)
-            content.append(f" - {gpu_info['architecture']}\n", style=text_color)
+            content.append(f" - {gpu_info['architecture']} cap {gpu_info['cuda_capability']}\n", style=text_color)
     else:
         content.append("  None\n", style=text_color)
 
@@ -130,17 +191,40 @@ def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, d
     # Remove columns where all values are None
     print_result = print_result.dropna(axis="columns", how="all")
 
+    # Merge memory columns into a single combined column
+    has_process_mem = _has_mem(print_result, "gpu_memory_bytes")
+    has_torch_mem = _has_mem(print_result, "torch_memory_bytes")
+    if has_process_mem and has_torch_mem:
+        print_result["memory"] = list(zip(print_result["torch_memory_bytes"], print_result["gpu_memory_bytes"]))
+        print_result = print_result.drop(columns=["torch_memory_bytes", "gpu_memory_bytes"])
+        memory_col_header = "Memory: Torch (Process)"
+    elif has_process_mem:
+        print_result["memory"] = print_result["gpu_memory_bytes"]
+        print_result = print_result.drop(columns=["gpu_memory_bytes"])
+        memory_col_header = "Process Memory"
+    elif has_torch_mem:
+        print_result["memory"] = print_result["torch_memory_bytes"]
+        print_result = print_result.drop(columns=["torch_memory_bytes"])
+        memory_col_header = "Torch Memory"
+    else:
+        raise RuntimeError("Invalid Memory Column")
+
     # Format values for display
     for column in print_result.columns:
-        if column == "time_total_batch_normalized":
+        if column == "memory":
+            if has_process_mem and has_torch_mem:
+                print_result[column] = print_result[column].apply(
+                    lambda x: f"{format_num(x[0], bytes=True)} ({format_num(x[1], bytes=True)})"
+                )
+            else:
+                print_result[column] = print_result[column].apply(lambda x: f"{format_num(x, bytes=True)}")
+        elif column == "time_total_batch_normalized":
             top3 = print_result.time_total_batch_normalized.nsmallest(3).index
             print_result[column] = print_result[column].apply(format_seconds)
             for i, emoji in enumerate(["🥇", "🥈", "🥉"][: len(top3)]):
                 print_result.loc[top3[i], column] = f"{emoji} {print_result.loc[top3[i], column]}"
         elif column.startswith("time"):
             print_result[column] = print_result[column].apply(format_seconds)
-        elif "bytes" in column:
-            print_result[column] = print_result[column].apply(format_num, bytes=True)
         elif column == "device":
             print_result[column] = print_result[column].apply(lambda x: f"{x}")
         elif column in custom_metric_keys:
@@ -159,14 +243,15 @@ def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, d
             style = "bold cyan"
         elif col.startswith("time"):
             style = None
-        elif "memory" in col:
-            style = "red"
+        elif col == "memory":
+            col = memory_col_header
+            style = None
         else:
             style = None
 
         # Format column names for better display
         display_name = col.replace("_", " ").title()
-        table.add_column(display_name, style=style, justify="right")
+        table.add_column(header=display_name, style=style, justify="right")
 
     # Add rows to the table
     for _, row in print_result.iterrows():
@@ -206,11 +291,21 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: L
     table.add_column(metric_title, header_style="bold cyan")
     table.add_column("", justify="right")
     table.add_column("", justify="right")
-    table.add_column("Memory", header_style="bold red")
+    mem_header = Text()
+
+    if _has_mem(results, "torch_memory_bytes"):
+        mem_header.append("Torch Memory", style="bold red")
+        mem_header.append(" / ", style="bold")
+    mem_header.append("Process Memory", style="bold bright_white")
+    table.add_column(mem_header)
     table.add_column("", justify="right")
 
     max_first_metric = results[first_metric].max().item()
-    max_mem = results.memory_bytes.max().item()
+    max_process_mem = (
+        results.gpu_memory_bytes.max().item()
+        if _has_mem(results, "gpu_memory_bytes")
+        else results.torch_memory_bytes.max().item()
+    )
     for model in results.model.unique():
         model_results = results[results.model == model]
         for device in model_results.device.unique():
@@ -230,7 +325,8 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: L
             print_result = print_result.sort_values(first_metric)
             for _, res in print_result.iterrows():
                 first_val = res[first_metric]
-                mem_val = res.memory_bytes
+                gpu_mem_val = res.gpu_memory_bytes
+                torch_mem_val = res.torch_memory_bytes if _has_mem(res, "torch_memory_bytes") else gpu_mem_val
                 table.add_row(
                     Text(model, style="green"),
                     Text(res.runtime_options, style="blue"),
@@ -242,8 +338,8 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: L
                         style="cyan",
                     ),
                     "   ",
-                    Bar(begin=0, size=max_mem, end=mem_val, width=80, color="red"),
-                    Text(str(format_num(mem_val, bytes=True)), style="red"),
+                    MemoryBar(torch_mem=torch_mem_val, gpu_mem=gpu_mem_val, max_mem=max_process_mem, width=80),
+                    _format_memory_label(torch_mem_val, gpu_mem_val),
                 )
 
     console.print(Panel(table, border_style="dim", padding=(0, 1)))

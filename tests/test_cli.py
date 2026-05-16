@@ -51,18 +51,22 @@ def _check_files(directory, files):
 
 def _check_run_files(cfg: omegaconf.DictConfig):
     expected_files = copy(EXPECTED_OUTPUT_FILES)
-    for model_name in cfg.nvbenjo.models.keys():
+    for model_name, model_cfg in cfg.nvbenjo.models.items():
         expected_files.append(join(model_name, "time_inference.png"))
         expected_files.append(join(model_name, "time_total_batch_normalized.png"))
         expected_files.append(join(model_name, "time_device_to_cpu.png"))
         expected_files.append(join(model_name, "time_cpu_to_device.png"))
-        expected_files.append(join(model_name, "memory_bytes.png"))
+        expected_files.append(join(model_name, "gpu_memory_bytes.png"))
+        if not model_cfg.get("type_or_path", "").endswith(".onnx") and not model_cfg.get("type_or_path", "").startswith(
+            "onnx:"
+        ):
+            expected_files.append(join(model_name, "torch_memory_bytes.png"))
     if len(cfg.nvbenjo.models) > 1:
         expected_files.append(join("summary", "time_inference.png"))
         expected_files.append(join("summary", "time_total_batch_normalized.png"))
         expected_files.append(join("summary", "time_device_to_cpu.png"))
         expected_files.append(join("summary", "time_cpu_to_device.png"))
-        expected_files.append(join("summary", "memory_bytes.png"))
+        expected_files.append(join("summary", "gpu_memory_bytes.png"))
     _check_files(cfg.output_dir, expected_files)
     for model_name in cfg.nvbenjo.models.keys():
         for runtime_name in cfg.nvbenjo.models[model_name].get("runtime_options", {}).keys():

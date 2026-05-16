@@ -8,7 +8,7 @@ requires-python = ">=3.10,<3.15"
 dependencies = [
   "torchvision",
   "torchaudio",
-  "nvitop",
+  "nvidia-ml-py",
   "psutil",
   "py-cpuinfo",
   "hydra-core",
