@@ -16,7 +16,13 @@ model_cfg = cfg.TorchModelConfig(
     num_warmup_batches=2,
     num_batches=5,
     runtime_options={
-        "fp32": cfg.TorchRuntimeConfig(precision=PrecisionType.FP32),
+        "fp32": cfg.TorchRuntimeConfig(
+            precision=PrecisionType.FP32,
+            matmul_precision="high",
+            cuda_graphs=True,
+            compile="torch_compile",
+            enable_profiling=False,
+        ),
     },
 )
 results = benchmark.benchmark_models({"resnet50": model_cfg})
