@@ -315,21 +315,25 @@ def benchmark_model(
         progress_bar = _get_progress_bar()
     console = progress_bar.console
 
-    iter_cfgs = list(itertools.product(*[model_cfg.devices, model_cfg.batch_sizes, model_cfg.runtime_options.items()]))
+    iter_cfgs = ty.cast(
+        list[tuple[str, int, tuple[str, TorchRuntimeConfig | OnnxRuntimeConfig]]],
+        list(itertools.product(model_cfg.devices, model_cfg.batch_sizes, model_cfg.runtime_options.items())),
+    )
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
-    for device, batch_size, (runtime_option_name, runtime_cfg) in iter_cfgs:
+    for device_str, batch_size, (runtime_option_name, runtime_cfg) in iter_cfgs:
         if precision_batch_oom.get(runtime_option_name, np.inf) < batch_size:
             # already went oom for these runtime options with smaller batch size -> skip bigger one
             progress_bar.advance(bench_task)
             continue
         try:
-            device = _get_device(runtime_cfg, device, console)
+            device = _get_device(runtime_cfg, device_str, console)
             progress_bar.update(
                 bench_task, description=f"  Device {device} | batch-size: {batch_size} | {runtime_option_name}"
             )
 
             model = load_model(model_cfg.type_or_path, device=device, runtime_config=runtime_cfg, **model_cfg.kwargs)
             if isinstance(model_cfg, TorchModelConfig):
+                assert isinstance(runtime_cfg, TorchRuntimeConfig)
                 batch: utils.TensorLike
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 

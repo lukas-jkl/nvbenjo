@@ -251,7 +251,8 @@ def measure_repeated_inference_timing(
     # run model once so we know the output shapes
     outputs = model.run(None, {n: d.cpu().numpy() for n, d in sample.items()})
     output_shapes = {
-        onnx_output.name: output_shape.shape for onnx_output, output_shape in zip(onnx_model_outputs, outputs)
+        onnx_output.name: output_shape.shape  # ty: ignore[unresolved-attribute]
+        for onnx_output, output_shape in zip(onnx_model_outputs, outputs)
     }
     del outputs
 

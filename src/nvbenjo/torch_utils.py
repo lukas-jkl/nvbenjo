@@ -513,7 +513,7 @@ def _copy_into(dst: TensorLike, src: TensorLike) -> None:
         return
     if isinstance(dst, dict) and isinstance(src, dict):
         for k, d in dst.items():
-            _copy_into(d, src[k])  # type: ignore[index]
+            _copy_into(d, src[k])  # type: ignore[index]  # ty: ignore[invalid-argument-type]
         return
     raise ValueError(f"Unsupported batch type for CUDA graph copy: {type(dst)}")
 
