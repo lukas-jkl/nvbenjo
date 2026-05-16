@@ -7,7 +7,7 @@ import threading
 import time
 import typing as ty
 from collections.abc import Sequence
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -203,6 +203,17 @@ def apply_non_amp_model_precision(
                 raise ValueError(f"Invalid precision type {precision}.")
 
     return model
+
+
+@contextmanager
+def matmul_precision_ctxt(precision: str | None) -> ty.Generator:
+    old_precision = torch.get_float32_matmul_precision()
+    try:
+        if precision is not None:
+            torch.set_float32_matmul_precision(precision=precision)
+        yield True
+    finally:
+        torch.set_float32_matmul_precision(precision=old_precision)
 
 
 def get_amp_ctxt_for_precision(precision: PrecisionType, device: torch.device) -> AbstractContextManager:
