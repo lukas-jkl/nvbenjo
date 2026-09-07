@@ -6,9 +6,11 @@ from torch import nn
 
 from nvbenjo.cfg import TorchRuntimeConfig
 from nvbenjo.torch_utils import (
+    _aoti_load_kwargs,
     apply_batch_precision,
     apply_non_amp_model_precision,
     get_amp_ctxt_for_precision,
+    get_model,
     get_model_parameters,
     run_model_with_input,
 )
@@ -139,3 +141,48 @@ def test_run_model_with_input_dict_as_single_arg():
     model = DictArgModel()
     out = run_model_with_input(model, {"a": torch.tensor([1.0]), "b": torch.tensor([2.0])})
     assert torch.equal(out, torch.tensor([3.0]))
+
+
+class _ConstAttrModel(nn.Module):
+    """Model with a plain tensor attribute, which torch.export lifts into a constant."""
+
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Linear(4, 4, bias=False)
+        self.offset = torch.arange(4, dtype=torch.float32)
+
+    def forward(self, x):
+        return self.fc(x) + self.offset
+
+
+def test_load_exported_module_puts_constants_on_device(tmp_path):
+    program = torch.export.export(_ConstAttrModel().eval(), (torch.randn(2, 4),))
+    path = tmp_path / "model.pt2"
+    torch.export.save(program, str(path))
+
+    meta = torch.device("meta")
+    module = get_model(f"torchexport:{path}", device=meta, runtime_config=TorchRuntimeConfig())
+
+    devices = {t.device for t in list(module.parameters()) + list(module.buffers())}
+    devices |= {v.device for sub in module.modules() for v in sub.__dict__.values() if isinstance(v, torch.Tensor)}
+    assert devices == {meta}
+
+
+def test_aoti_load_kwargs_pins_cuda_device_index():
+    kwargs = _aoti_load_kwargs(torch.device("cuda:1"), run_single_threaded=True)
+    assert kwargs == {"run_single_threaded": True, "device_index": 1}
+    # No index and no CUDA -> nothing to pin, and ``None`` values are dropped.
+    assert _aoti_load_kwargs(torch.device("cuda"), run_single_threaded=None) == {}
+    assert _aoti_load_kwargs(torch.device("cpu"), run_single_threaded=True) == {"run_single_threaded": True}
+
+
+def test_load_exported_module_runs_on_other_device(tmp_path):
+    """A CPU-exported program must run on the benchmark device (constants + baked asserts)."""
+    program = torch.export.export(_ConstAttrModel().eval(), (torch.randn(2, 4),))
+    path = tmp_path / "model.pt2"
+    torch.export.save(program, str(path))
+
+    meta = torch.device("meta")
+    module = get_model(f"torchexport:{path}", device=meta, runtime_config=TorchRuntimeConfig())
+    out = module(torch.randn(2, 4, device=meta))
+    assert out.device == meta
