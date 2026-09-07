@@ -1,4 +1,5 @@
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -16,6 +17,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from packaging.version import Version
+from torch.export.passes import move_to_device_pass
 
 try:
     # PyTorch's aoti_load_package reaches for torch._inductor.codecache without
@@ -81,15 +83,12 @@ def get_model(
         if verbose and console is not None:
             console.print(f"Loading torchexport model {type_or_path}")
         type_or_path = type_or_path[len("torchexport:") :]
-        program = torch.export.load(os.path.expanduser(type_or_path))
-        module = program.module()
-        module = module.to(device)
-        return module
+        return _load_exported_module(os.path.expanduser(type_or_path), device)
     elif type_or_path.startswith("aot:"):
         if verbose and console is not None:
             console.print(f"Loading AOT model {type_or_path}")
         type_or_path = type_or_path[len("aot:") :]
-        return torch._inductor.aoti_load_package(os.path.expanduser(type_or_path))
+        return torch._inductor.aoti_load_package(os.path.expanduser(type_or_path), **_aoti_load_kwargs(device))
     elif os.path.isfile(type_or_path):
         # Path and no prefix -> try different methods
         if verbose and console is not None:
@@ -104,12 +103,11 @@ def get_model(
             except Exception:
                 if Version(torch.__version__) > Version("2.1"):
                     try:
-                        program = torch.export.load(os.path.expanduser(type_or_path))
-                        module = program.module()
-                        module = module.to(device)
-                        return module
+                        return _load_exported_module(os.path.expanduser(type_or_path), device)
                     except Exception:
-                        return torch._inductor.aoti_load_package(os.path.expanduser(type_or_path))
+                        return torch._inductor.aoti_load_package(
+                            os.path.expanduser(type_or_path), **_aoti_load_kwargs(device)
+                        )
                 else:
                     raise
 
@@ -140,6 +138,29 @@ def get_model(
             "- 'huggingface:<model-name>' for a HuggingFace AutoModel\n"
             f"- 'torchvision:<model-name>' from {available_torchvision_models}\n"
         )
+
+
+def _load_exported_module(path: str, device: torch.device) -> nn.Module:
+    """Load a ``torch.export`` saved program and place it on ``device``.
+
+    ``program.module().to(device)`` is not enough: it moves parameters and buffers but
+    leaves the lifted tensor constants behind. ``move_to_device_pass`` handles both.
+    """
+    program = torch.export.load(path)
+    return move_to_device_pass(program, device).module()
+
+
+def _aoti_load_kwargs(device: torch.device, **kwargs: Any) -> dict[str, Any]:
+    """Build ``aoti_load_package`` kwargs, pinning the CUDA device index when supported."""
+    load_kwargs = {k: v for k, v in kwargs.items() if v is not None}
+    if device.type == "cuda" and device.index is not None:
+        try:
+            supported = "device_index" in inspect.signature(torch._inductor.aoti_load_package).parameters
+        except (TypeError, ValueError):  # pragma: no cover - builtin/patched callables
+            supported = False
+        if supported:
+            load_kwargs["device_index"] = device.index
+    return load_kwargs
 
 
 def run_model_with_input(model: nn.Module | Callable, input: TensorLike) -> TensorLike:
@@ -455,14 +476,15 @@ def _aot_cache_path(
 def _export_program(model: Any, batch: TensorLike, device: torch.device) -> Any:
     if not isinstance(model, nn.Module):
         return model.to(device)
+    model = model.to(device)
     device_batch = transfer_to_device(batch, device)
     if isinstance(device_batch, dict):
-        return torch.export.export(model.to(device), args=(), kwargs=device_batch)
+        return torch.export.export(model, args=(), kwargs=device_batch)
     if isinstance(device_batch, (tuple, list)):
         batch_args = tuple(device_batch)
     else:
         batch_args = (device_batch,)
-    return torch.export.export(model.to(device), batch_args)
+    return torch.export.export(model, batch_args)
 
 
 def _aot_compile_or_load(
@@ -483,9 +505,7 @@ def _aot_compile_or_load(
     # run_single_threaded avoids internal threading that conflicts with
     # external CUDA graph capture (pytorch/pytorch#158834, fixed in 2.8+).
     # see https://github.com/pytorch/pytorch/commit/85467ed063d284fa21a2f1d2adfec8fda544923d
-    load_kwargs: dict[str, Any] = {}
-    if runtime_cfg.cuda_graphs:
-        load_kwargs["run_single_threaded"] = True
+    load_kwargs = _aoti_load_kwargs(device, run_single_threaded=runtime_cfg.cuda_graphs or None)
 
     if cache_path is not None and cache_path.exists():
         with progress_task(progress_bar, f"    Load AOT compiled model {cache_path}...", total=None):
