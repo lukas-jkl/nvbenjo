@@ -1,5 +1,6 @@
-import nox  # type: ignore
 import os
+
+import nox  # type: ignore
 import requests
 
 

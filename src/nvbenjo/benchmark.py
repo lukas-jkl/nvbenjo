@@ -1,20 +1,20 @@
+import functools
 import itertools
 import logging
 import time
-import functools
 import typing as ty
-from typing import Any, Callable, Optional, Dict
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
 from rich import progress
 from rich.progress import Progress
+from torch import nn
 
-import nvbenjo.utils as utils
-from nvbenjo import console, torch_utils
-from nvbenjo.cfg import BaseModelConfig, TorchModelConfig, OnnxModelConfig, TorchRuntimeConfig, OnnxRuntimeConfig
+from nvbenjo import console, torch_utils, utils
+from nvbenjo.cfg import BaseModelConfig, OnnxModelConfig, OnnxRuntimeConfig, TorchModelConfig, TorchRuntimeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,12 @@ def load_model(
             raise ValueError(f"Unknown runtime config type {type(runtime_config)}")
 
 
-def _test_load_models(model_cfgs: Dict[str, BaseModelConfig]) -> None:
+def _test_load_models(model_cfgs: dict[str, BaseModelConfig]) -> None:
     loaded_types = []
     logger.info("Checking if models are valid and available")
-    for _, model_cfg in model_cfgs.items():
+    for model_cfg in model_cfgs.values():
         if model_cfg.type_or_path not in loaded_types:
-            initial_runtime_options = list(model_cfg.runtime_options.values())[0]
+            initial_runtime_options = next(iter(model_cfg.runtime_options.values()))
             _ = load_model(
                 model_cfg.type_or_path,
                 device=torch.device("cpu"),
@@ -64,7 +64,7 @@ def _test_load_models(model_cfgs: Dict[str, BaseModelConfig]) -> None:
             loaded_types.append(model_cfg.type_or_path)
 
 
-def benchmark_models(model_cfgs: Dict[str, BaseModelConfig], measure_memory: Optional[bool] = True) -> pd.DataFrame:
+def benchmark_models(model_cfgs: dict[str, BaseModelConfig], measure_memory: bool | None = True) -> pd.DataFrame:
     """Benchmark the given models.
 
     Parameters
@@ -145,7 +145,7 @@ def _run_warmup(
     batch: utils.TensorLike,
     device: torch.device,
     num_warmup_batches: int,
-    progress_bar: Optional[Progress],
+    progress_bar: Progress | None,
 ):
     try:
         if progress_bar is not None:
@@ -156,7 +156,7 @@ def _run_warmup(
             r = torch_utils.run_model_with_input(model, batch)
             try:
                 _ = torch_utils.transfer_to_device(r, to_device=torch.device("cpu"))
-            except Exception:
+            except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
                 console.print(utils.TRANSFER_WARNING)
 
             if progress_bar is not None:
@@ -173,9 +173,9 @@ def _measure_timings(
     batch_size: int,
     device: torch.device,
     num_batches: int,
-    progress_bar: Optional[Progress],
+    progress_bar: Progress | None,
     timing_function: Callable = torch_utils.measure_repeated_inference_timing,
-    profiler: Optional[torch.profiler.profile] = None,
+    profiler: torch.profiler.profile | None = None,
 ) -> pd.DataFrame:
     if progress_bar is not None:
         measure_task = progress_bar.add_task(
@@ -288,8 +288,8 @@ def _get_device(runtime_config: OnnxRuntimeConfig | TorchRuntimeConfig, device: 
 # TODO: !! two seperate functions torch and onnx
 def benchmark_model(
     model_cfg: BaseModelConfig,
-    measure_memory: Optional[bool] = True,
-    progress_bar: Optional[Progress] = None,
+    measure_memory: bool | None = True,
+    progress_bar: Progress | None = None,
 ) -> pd.DataFrame:
     """Benchmark one model configuration.
 
@@ -467,7 +467,7 @@ def benchmark_model(
                     timing_function=onnx_utils.measure_repeated_inference_timing,
                 )
             else:
-                raise ValueError(f"Unknown model config type {type(model_cfg)}")
+                raise TypeError(f"Unknown model config type {type(model_cfg)}")
 
             del model
             del batch
@@ -482,19 +482,19 @@ def benchmark_model(
             results.append(cur_results)
         except torch.cuda.OutOfMemoryError:
             console.print(
-                f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {str(device)}[/red]"
+                f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {device!s}[/red]"
             )
             precision_batch_oom[runtime_option_name] = batch_size
             continue
         except Exception as e:
             if "Failed to allocate memory" in str(e) or "ALLOC_FAILED" in str(e):
                 console.print(
-                    f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {str(device)}[/red]"
+                    f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {device!s}[/red]"
                 )
                 precision_batch_oom[runtime_option_name] = batch_size
                 continue
             else:
-                raise e
+                raise
         finally:
             progress_bar.advance(bench_task)
 

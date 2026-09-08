@@ -1,18 +1,17 @@
 import os
+from collections.abc import Sequence
 from os.path import join
-from typing import List
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from rich import box
 import seaborn as sns
+from rich import box
 from rich.bar import Bar
+from rich.console import Console, ConsoleOptions, RenderResult
+from rich.measure import Measurement
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-
-from rich.measure import Measurement
-from rich.console import Console, ConsoleOptions, RenderResult
 
 from . import console
 from .utils import format_num, format_seconds
@@ -73,17 +72,20 @@ def _has_mem(results: pd.Series | pd.DataFrame, key: str):
     return key in results.columns and not results[key].isnull().all()
 
 
+DEFAULT_PLOT_KEYS = (
+    "time_cpu_to_device",
+    "time_device_to_cpu",
+    "time_inference",
+    "time_total_batch_normalized",
+    "torch_memory_bytes",
+    "gpu_memory_bytes",
+)
+
+
 def visualize_results(
     results: pd.DataFrame,
     output_dir: str,
-    keys: List[str] = [
-        "time_cpu_to_device",
-        "time_device_to_cpu",
-        "time_inference",
-        "time_total_batch_normalized",
-        "torch_memory_bytes",
-        "gpu_memory_bytes",
-    ],
+    keys: Sequence[str] = DEFAULT_PLOT_KEYS,
     hue="runtime_options",
     col="batch_size",
     kind="bar",
@@ -171,7 +173,9 @@ def print_system_info(system_info: dict):
     console.print(Panel(content, title=title, border_style="blue", padding=(0, 2)))
 
 
-def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, device: str, custom_metric_keys: List):
+def _print_device_results(
+    model_results: pd.Series | pd.DataFrame, model: str, device: str, custom_metric_keys: Sequence[str]
+):
     # Create a rich table for each model+device combination
     table = Table(
         title=f"Model: {model} on Device: {device}",
@@ -261,7 +265,7 @@ def _print_device_results(model_results: pd.Series | pd.DataFrame, model: str, d
     console.print(Panel(table, border_style="dim", padding=(0, 1)))
 
 
-def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: List):
+def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: Sequence[str]):
     default_metric = "time_total_batch_normalized"
     default_metric_title = "Time Batch Normalized"
     has_custom_metric = (
@@ -345,7 +349,7 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: L
     console.print(Panel(table, border_style="dim", padding=(0, 1)))
 
 
-def print_results(results: pd.DataFrame, custom_metric_keys: List[str] = []):
+def print_results(results: pd.DataFrame, custom_metric_keys: Sequence[str] = ()):
     for model in results.model.unique():
         model_results = results[results.model == model]
         for device in model_results.device.unique():

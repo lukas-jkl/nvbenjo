@@ -18,7 +18,7 @@ from nvbenjo.utils import CompileMode, PrecisionType
 def test_get_model_parameters():
     class SimpleModel(nn.Module):
         def __init__(self):
-            super(SimpleModel, self).__init__()
+            super().__init__()
             self.fc = nn.Linear(10, 10, bias=False)
 
         def forward(self, x):
@@ -32,7 +32,7 @@ def test_get_model_parameters():
 def test_apply_non_amp_model_precision():
     class SimpleModel(nn.Module):
         def __init__(self):
-            super(SimpleModel, self).__init__()
+            super().__init__()
             self.fc = nn.Linear(10, 10, bias=False)
 
         def forward(self, x):
@@ -88,7 +88,7 @@ def test_apply_non_amp_model_precision():
 def test_apply_precision(precision, expected_dtype):
     class SimpleModel(nn.Module):
         def __init__(self):
-            super(SimpleModel, self).__init__()
+            super().__init__()
             self.fc = nn.Linear(10, 10, bias=False)
 
         def forward(self, x):

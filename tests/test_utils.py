@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
@@ -7,11 +7,11 @@ from nvbenjo.benchmark import _get_device
 from nvbenjo.cfg import OnnxRuntimeConfig
 from nvbenjo.utils import (
     EXAMPLE_VALID_SHAPES,
+    NoBatchShapeError,
     _check_shape_dict,
     format_num,
     format_seconds,
     get_rnd_from_shape_s,
-    NoBatchShapeError,
 )
 
 
@@ -63,7 +63,7 @@ def test_get_rnd_shape_invalid():
         _ = get_rnd_from_shape_s((1, 3, 224, 224), batch_size=12)  # missing batch size identifier
 
     with pytest.raises(ValueError):
-        _ = get_rnd_from_shape_s(tuple(), batch_size=12, min_val=0, max_val=1)
+        _ = get_rnd_from_shape_s((), batch_size=12, min_val=0, max_val=1)
 
 
 def test_get_rnd_shape_valid():
@@ -103,33 +103,30 @@ def test_get_rnd_shape_valid():
 def test_get_device_onnx_cpu_with_cuda_provider(mock_cuda):
     mock_ort = MagicMock()
     mock_ort.get_available_providers.return_value = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
-        with patch("nvbenjo.onnx_utils.ort", mock_ort):
-            cfg = OnnxRuntimeConfig(execution_providers=["CUDAExecutionProvider"])
-            device = _get_device(cfg, "cpu", MagicMock())
-            assert device == torch.device("cuda:0")
+    with patch.dict("sys.modules", {"onnxruntime": mock_ort}), patch("nvbenjo.onnx_utils.ort", mock_ort):
+        cfg = OnnxRuntimeConfig(execution_providers=["CUDAExecutionProvider"])
+        device = _get_device(cfg, "cpu", MagicMock())
+        assert device == torch.device("cuda:0")
 
 
 @patch("torch.cuda.is_available", return_value=True)
 def test_get_device_onnx_cpu_with_cuda_provider_device_id(mock_cuda):
     mock_ort = MagicMock()
     mock_ort.get_available_providers.return_value = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
-        with patch("nvbenjo.onnx_utils.ort", mock_ort):
-            cfg = OnnxRuntimeConfig(execution_providers=[("CUDAExecutionProvider", {"device_id": 1})])
-            device = _get_device(cfg, "cpu", MagicMock())
-            assert device == torch.device("cuda:1")
+    with patch.dict("sys.modules", {"onnxruntime": mock_ort}), patch("nvbenjo.onnx_utils.ort", mock_ort):
+        cfg = OnnxRuntimeConfig(execution_providers=[("CUDAExecutionProvider", {"device_id": 1})])
+        device = _get_device(cfg, "cpu", MagicMock())
+        assert device == torch.device("cuda:1")
 
 
 @patch("torch.cuda.is_available", return_value=True)
 def test_get_device_onnx_cuda_with_cuda_provider(mock_cuda):
     mock_ort = MagicMock()
     mock_ort.get_available_providers.return_value = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-    with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
-        with patch("nvbenjo.onnx_utils.ort", mock_ort):
-            cfg = OnnxRuntimeConfig(execution_providers=["CUDAExecutionProvider"])
-            device = _get_device(cfg, "cuda", MagicMock())
-            assert device == torch.device("cuda")
+    with patch.dict("sys.modules", {"onnxruntime": mock_ort}), patch("nvbenjo.onnx_utils.ort", mock_ort):
+        cfg = OnnxRuntimeConfig(execution_providers=["CUDAExecutionProvider"])
+        device = _get_device(cfg, "cuda", MagicMock())
+        assert device == torch.device("cuda")
 
 
 @patch("torch.cuda.is_available", return_value=True)
@@ -137,14 +134,13 @@ def test_get_device_onnx_cuda_no_cuda_provider(mock_cuda):
     mock_ort = MagicMock()
     mock_ort.get_available_providers.return_value = ["CPUExecutionProvider"]
     mock_console = MagicMock()
-    with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
-        with patch("nvbenjo.onnx_utils.ort", mock_ort):
-            cfg = OnnxRuntimeConfig(execution_providers=["CPUExecutionProvider"])
-            device = _get_device(cfg, "cuda", mock_console)
-            assert device == torch.device("cpu")
-            mock_console.print.assert_called_once_with(
-                "[yellow]CUDAExecutionProvider is not available in onnxruntime. Running on CPU.[/yellow]"
-            )
+    with patch.dict("sys.modules", {"onnxruntime": mock_ort}), patch("nvbenjo.onnx_utils.ort", mock_ort):
+        cfg = OnnxRuntimeConfig(execution_providers=["CPUExecutionProvider"])
+        device = _get_device(cfg, "cuda", mock_console)
+        assert device == torch.device("cpu")
+        mock_console.print.assert_called_once_with(
+            "[yellow]CUDAExecutionProvider is not available in onnxruntime. Running on CPU.[/yellow]"
+        )
 
 
 @patch("torch.cuda.is_available", return_value=False)
@@ -152,12 +148,11 @@ def test_get_device_onnx_cuda_no_cuda_available(mock_cuda):
     mock_ort = MagicMock()
     mock_ort.get_available_providers.return_value = ["CPUExecutionProvider"]
     mock_console = MagicMock()
-    with patch.dict("sys.modules", {"onnxruntime": mock_ort}):
-        with patch("nvbenjo.onnx_utils.ort", mock_ort):
-            cfg = OnnxRuntimeConfig(execution_providers=["CPUExecutionProvider"])
-            device = _get_device(cfg, "cuda", mock_console)
-            assert device == torch.device("cpu")
-            mock_console.print.assert_called_once_with("[yellow]CUDA is not available. Running on CPU.[/yellow]")
+    with patch.dict("sys.modules", {"onnxruntime": mock_ort}), patch("nvbenjo.onnx_utils.ort", mock_ort):
+        cfg = OnnxRuntimeConfig(execution_providers=["CPUExecutionProvider"])
+        device = _get_device(cfg, "cuda", mock_console)
+        assert device == torch.device("cpu")
+        mock_console.print.assert_called_once_with("[yellow]CUDA is not available. Running on CPU.[/yellow]")
 
 
 def test_get_device_invalid_runtime_config_cpu():
