@@ -5,10 +5,11 @@ from abc import ABC
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
+
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from .utils import PrecisionType, ProviderType, CompileMode
+from .utils import CompileMode, PrecisionType, ProviderType
 
 
 def _default_cache_dir() -> str:
@@ -82,7 +83,7 @@ class NvbenjoConfig:
     """
 
     measure_memory: bool = True
-    models: dict[str, ty.Any] = field(default_factory=lambda: dict())
+    models: dict[str, ty.Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -100,7 +101,7 @@ class BenchConfig:
     """
 
     nvbenjo: NvbenjoConfig = field(default_factory=NvbenjoConfig)
-    output_dir: ty.Optional[str] = None
+    output_dir: str | None = None
 
 
 @dataclass
@@ -150,13 +151,13 @@ class TorchRuntimeConfig:
     compile: str = "False"
     compile_kwargs: dict = field(default_factory=dict)
     precision: PrecisionType = PrecisionType.FP32
-    matmul_precision: ty.Optional[ty.Literal["highest", "high", "medium"]] = None
+    matmul_precision: ty.Literal["highest", "high", "medium"] | None = None
     cuda_graphs: bool = False
     cuda_graph_kwargs: dict = field(default_factory=dict)
     enable_profiling: bool = False
-    profiling_prefix: ty.Optional[str] = None
+    profiling_prefix: str | None = None
     profiler_kwargs: dict = field(default_factory=dict)
-    cache_dir: ty.Optional[str] = field(default_factory=_default_cache_dir)
+    cache_dir: str | None = field(default_factory=_default_cache_dir)
 
     def __post_init__(self):
         # Hydra passes everything as primitives, normalize here
@@ -192,7 +193,7 @@ class OnnxRuntimeConfig:
         Additional options for each execution provider.
     """
 
-    execution_providers: ty.Optional[ty.List[ProviderType]] = None
+    execution_providers: list[ProviderType] | None = None
     graph_optimization_level: str = (
         "ORT_ENABLE_ALL"  # 99 ORT_ENABLE_ALL, 3 ORT_ENABLE_LAYOUT, 1 ORT_ENABLE_BASIC, 0 ORT_DISABLE_ALL
     )
@@ -200,7 +201,7 @@ class OnnxRuntimeConfig:
     inter_op_num_threads: int = 0
     log_severity_level: int = 3  # Error
     enable_profiling: bool = False
-    profiling_prefix: ty.Optional[str] = None
+    profiling_prefix: str | None = None
     provider_options: ty.Sequence[dict[ty.Any, ty.Any]] | None = None
 
 
@@ -334,7 +335,7 @@ class OnnxModelConfig(BaseModelConfig):
                 self.runtime_options[key] = OmegaConf.structured(OnnxRuntimeConfig(**OmegaConf.to_container(opt)))  # type: ignore
 
 
-def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[str, BaseModelConfig]:
+def instantiate_model_configs(cfg: BenchConfig | DictConfig) -> dict[str, BaseModelConfig]:
     models = {}
     runtimes = {}
     for model_name, model in cfg.nvbenjo.models.items():
@@ -348,7 +349,7 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
                     cfg.nvbenjo.models[model_name]["_convert_"] = "all"
                     if "runtime_options" in model:
                         runtimes[model_name] = {}
-                        for runtime_name in model["runtime_options"].keys():
+                        for runtime_name in model["runtime_options"]:
                             cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["_target_"] = (
                                 f"{OnnxRuntimeConfig.__module__}.{OnnxRuntimeConfig.__qualname__}"
                             )
@@ -362,7 +363,7 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
                     cfg.nvbenjo.models[model_name]["_convert_"] = "all"
                     if "runtime_options" in model:
                         runtimes[model_name] = {}
-                        for runtime_name in model["runtime_options"].keys():
+                        for runtime_name in model["runtime_options"]:
                             cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["_target_"] = (
                                 f"{TorchRuntimeConfig.__module__}.{TorchRuntimeConfig.__qualname__}"
                             )
@@ -391,7 +392,7 @@ def instantiate_model_configs(cfg: ty.Union[BenchConfig, DictConfig]) -> dict[st
                         )
                     else:
                         # make sure the relative path is inside the output dir
-                        if not os.path.abspath(runtime.profiling_prefix) == runtime.profiling_prefix:
+                        if os.path.abspath(runtime.profiling_prefix) != runtime.profiling_prefix:
                             runtime.profiling_prefix = os.path.abspath(
                                 os.path.join(cfg.output_dir, runtime.profiling_prefix)
                             )

@@ -7,30 +7,30 @@ import re
 import threading
 import time
 import typing as ty
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import pandas as pd
 import torch
-import torch.nn as nn
 import torchvision
 from packaging.version import Version
+from torch import nn
 from torch.export.passes import move_to_device_pass
 
 try:
     # PyTorch's aoti_load_package reaches for torch._inductor.codecache without
     # importing it, so register the attribute up front when available.
-    import torch._inductor.codecache  # noqa: F401
+    import torch._inductor.codecache
 except ImportError:
     pass
 from rich.progress import Progress
 
 from nvbenjo import console
 from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
+from nvbenjo.torch_ops import *
 from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task, sample_gpu_memory
-from nvbenjo.torch_ops import *  # noqa: F403
 
 logger = logging.getLogger(__name__)
 
@@ -97,14 +97,14 @@ def get_model(
             model = torch.load(os.path.expanduser(type_or_path), map_location=device, weights_only=False)
             model.eval()
             return model
-        except Exception:
+        except Exception:  # noqa: BLE001 - unknown checkpoint format, try the next loader
             try:
                 return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
             except Exception:
                 if Version(torch.__version__) > Version("2.1"):
                     try:
                         return _load_exported_module(os.path.expanduser(type_or_path), device)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 - unknown checkpoint format, try the next loader
                         return torch._inductor.aoti_load_package(
                             os.path.expanduser(type_or_path), **_aoti_load_kwargs(device)
                         )
@@ -210,7 +210,7 @@ def apply_batch_precision(batch: TensorLike, precision: PrecisionType) -> Tensor
     elif isinstance(batch, dict):
         batch = {k: _apply_batch_precision(v) for k, v in batch.items()}
     else:
-        raise ValueError(f"Unsupported batch type: {type(batch)}. Must be a Tensor, Tuple, or Dict.")
+        raise TypeError(f"Unsupported batch type: {type(batch)}. Must be a Tensor, Tuple, or Dict.")
 
     return batch
 
@@ -313,7 +313,7 @@ def measure_gpu_memory_allocation(
             r = run_model_with_input(model, batch)
         try:
             _ = transfer_to_device(r, to_device=torch.device("cpu"))
-        except Exception:
+        except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
             console.print(TRANSFER_WARNING)
     finally:
         if is_cuda:
@@ -338,7 +338,7 @@ def measure_repeated_inference_timing(
     model_device: torch.device,
     transfer_to_device_fn: Callable = transfer_to_device,
     num_runs: int = 100,
-    progress_callback: Optional[Callable] = None,
+    progress_callback: Callable | None = None,
 ) -> pd.DataFrame:
     """Measure inference times.
 
@@ -410,7 +410,7 @@ def measure_repeated_inference_timing(
 
         try:
             transfer_to_device_fn(device_result, torch.device("cpu"))
-        except Exception:
+        except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
             console.print(TRANSFER_WARNING)
         stop_on_cpu = time.perf_counter()
 
@@ -433,7 +433,7 @@ def measure_repeated_inference_timing(
     return results_raw
 
 
-def _file_meta(type_or_path: str) -> Optional[dict]:
+def _file_meta(type_or_path: str) -> dict | None:
     path = type_or_path
     for prefix in ("jit:", "torchexport:", "aot:"):
         if path.startswith(prefix):
@@ -494,7 +494,7 @@ def _aot_compile_or_load(
     model_cfg: TorchModelConfig,
     batch_size: int,
     runtime_cfg: TorchRuntimeConfig,
-    progress_bar: Optional[Progress],
+    progress_bar: Progress | None,
 ) -> Any:
     cache_path = (
         _aot_cache_path(runtime_cfg.cache_dir, model_cfg, batch_size, runtime_cfg, device)
@@ -511,7 +511,7 @@ def _aot_compile_or_load(
         with progress_task(progress_bar, f"    Load AOT compiled model {cache_path}...", total=None):
             try:
                 return torch._inductor.aoti_load_package(str(cache_path), **load_kwargs)
-            except Exception:
+            except Exception:  # noqa: BLE001 - stale or incompatible AOT cache; fall back to recompile
                 console.print(f"Failed to load AOT cache {cache_path}, falling back to recompile")
                 console.print_exception()
 
@@ -544,7 +544,7 @@ def _copy_into(dst: TensorLike, src: TensorLike) -> None:
         return
     if isinstance(dst, torch.Tensor):
         if not isinstance(src, torch.Tensor):
-            raise ValueError(f"Type mismatch copying into graph buffer: {type(dst)} vs {type(src)}")
+            raise TypeError(f"Type mismatch copying into graph buffer: {type(dst)} vs {type(src)}")
         dst.copy_(src, non_blocking=True)
         return
     if isinstance(dst, (list, tuple)) and isinstance(src, (list, tuple)):
@@ -611,8 +611,8 @@ def _cuda_graph_capture(
     batch: TensorLike,
     device: torch.device,
     num_warmup_iters: int,
-    capture_kwargs: Optional[dict] = None,
-    progress_bar: Optional[Progress] = None,
+    capture_kwargs: dict | None = None,
+    progress_bar: Progress | None = None,
 ) -> _CudaGraphedModel:
     """Capture ``model(batch)`` as a CUDA graph and return a copy-replay callable.
 

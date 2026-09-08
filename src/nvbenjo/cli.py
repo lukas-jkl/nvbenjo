@@ -1,13 +1,14 @@
+import functools
 import logging
+import operator
 import os
 import sys
-import typing as ty
+from importlib.metadata import version
 from importlib.resources import files
 from os.path import join
 
 import hydra
 from hydra.core.config_store import ConfigStore
-from importlib.metadata import version
 from omegaconf import DictConfig, OmegaConf
 from rich.logging import RichHandler
 
@@ -23,11 +24,11 @@ cs.store(name="base_config", node=BenchConfig)
 
 
 @hydra.main(version_base=None, config_path=os.path.join(str(files("nvbenjo").joinpath("conf"))), config_name="default")
-def _run_nvbenjo(cfg: ty.Union[BenchConfig, DictConfig]):
+def _run_nvbenjo(cfg: BenchConfig | DictConfig):
     run(cfg)
 
 
-def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
+def run(cfg: BenchConfig | DictConfig) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
     models = instantiate_model_configs(cfg)
     if cfg.output_dir is not None:
@@ -50,7 +51,9 @@ def run(cfg: ty.Union[BenchConfig, DictConfig]) -> None:
         with open(join(output_dir, "config.yaml"), "w") as f:
             f.write(OmegaConf.to_yaml(cfg))
 
-    custom_metric_keys = list(set(sum([list(mcfg.custom_batchmetrics.keys()) for mcfg in models.values()], [])))
+    custom_metric_keys = list(
+        set(functools.reduce(operator.iadd, [list(mcfg.custom_batchmetrics.keys()) for mcfg in models.values()], []))
+    )
     if output_dir is not None:
         logger.info("Generating plots...")
         plot.visualize_results(

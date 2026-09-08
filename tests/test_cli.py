@@ -2,13 +2,13 @@ import csv
 import os
 import shutil
 import subprocess
-import pandas as pd
 import tempfile
 import warnings
 from copy import copy
 from os.path import isfile, join
 
 import omegaconf
+import pandas as pd
 import pytest
 import torch
 import yaml
@@ -28,7 +28,7 @@ def run_config(cfg):
     if isinstance(cfg, omegaconf.DictConfig):
         run(cfg)
     else:
-        raise ValueError("Config is not a DictConfig instance")
+        raise TypeError("Config is not a DictConfig instance")
 
 
 def _check_files(directory, files):
@@ -68,8 +68,8 @@ def _check_run_files(cfg: omegaconf.DictConfig):
         expected_files.append(join("summary", "time_cpu_to_device.png"))
         expected_files.append(join("summary", "gpu_memory_bytes.png"))
     _check_files(cfg.output_dir, expected_files)
-    for model_name in cfg.nvbenjo.models.keys():
-        for runtime_name in cfg.nvbenjo.models[model_name].get("runtime_options", {}).keys():
+    for model_name in cfg.nvbenjo.models:
+        for runtime_name in cfg.nvbenjo.models[model_name].get("runtime_options", {}):
             if cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name].get("enable_profiling", False):
                 profile_prefix = cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name].get(
                     "profiling_prefix", None
@@ -96,31 +96,28 @@ def _check_run_files(cfg: omegaconf.DictConfig):
 
 
 def test_default():
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cfg = compose(config_name="default", overrides=[f"output_dir={tmpdir}"])
-            run_config(cfg)
+    with initialize(version_base=None, config_path="conf"), tempfile.TemporaryDirectory() as tmpdir:
+        cfg = compose(config_name="default", overrides=[f"output_dir={tmpdir}"])
+        run_config(cfg)
 
 
 def test_small_single():
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cfg = compose(config_name="small_single", overrides=[f"output_dir={tmpdir}"])
-            run_config(cfg)
-            _check_run_files(cfg)
+    with initialize(version_base=None, config_path="conf"), tempfile.TemporaryDirectory() as tmpdir:
+        cfg = compose(config_name="small_single", overrides=[f"output_dir={tmpdir}"])
+        run_config(cfg)
+        _check_run_files(cfg)
 
 
 def test_min_max_input_type():
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cfg = compose(config_name="input_min_max", overrides=[f"output_dir={tmpdir}"])
-            with pytest.raises(ValueError):
-                run_config(cfg)
+    with initialize(version_base=None, config_path="conf"), tempfile.TemporaryDirectory() as tmpdir:
+        cfg = compose(config_name="input_min_max", overrides=[f"output_dir={tmpdir}"])
+        with pytest.raises(ValueError):
+            run_config(cfg)
 
 
 class DummyModel(torch.nn.Module):
     def __init__(self):
-        super(DummyModel, self).__init__()
+        super().__init__()
         self.fc = torch.nn.Linear(10, 2)
 
     def forward(self, x):
@@ -130,24 +127,26 @@ class DummyModel(torch.nn.Module):
 def test_torch_load():
     model = DummyModel()
 
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
-            torch.save(model, tmpfile)
-            with tempfile.TemporaryDirectory() as tmpoutdir:
-                cfg = compose(
-                    config_name="torch_load",
-                    overrides=[
-                        f"output_dir={tmpoutdir}",
-                        f'nvbenjo.models.dummytorchmodel.type_or_path="{tmpfile.name}"',
-                    ],
-                )
-                run_config(cfg)
-                _check_run_files(cfg)
+    with (
+        initialize(version_base=None, config_path="conf"),
+        tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile,
+    ):
+        torch.save(model, tmpfile)
+        with tempfile.TemporaryDirectory() as tmpoutdir:
+            cfg = compose(
+                config_name="torch_load",
+                overrides=[
+                    f"output_dir={tmpoutdir}",
+                    f'nvbenjo.models.dummytorchmodel.type_or_path="{tmpfile.name}"',
+                ],
+            )
+            run_config(cfg)
+            _check_run_files(cfg)
 
 
 class DummyModelMultiInput(torch.nn.Module):
     def __init__(self):
-        super(DummyModelMultiInput, self).__init__()
+        super().__init__()
         self.fc1 = torch.nn.Linear(10, 1)
         self.fc2 = torch.nn.Linear(20, 1)
 
@@ -158,24 +157,26 @@ class DummyModelMultiInput(torch.nn.Module):
 def test_torch_load_multiinput():
     model = DummyModelMultiInput()
 
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
-            torch.save(model, tmpfile)
-            with tempfile.TemporaryDirectory() as tmpoutdir:
-                cfg = compose(
-                    config_name="torch_load_multiinput",
-                    overrides=[
-                        f"output_dir={tmpoutdir}",
-                        f'nvbenjo.models.dummytorchmodel.type_or_path="{tmpfile.name}"',
-                    ],
-                )
-                run_config(cfg)
-                _check_run_files(cfg)
+    with (
+        initialize(version_base=None, config_path="conf"),
+        tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile,
+    ):
+        torch.save(model, tmpfile)
+        with tempfile.TemporaryDirectory() as tmpoutdir:
+            cfg = compose(
+                config_name="torch_load_multiinput",
+                overrides=[
+                    f"output_dir={tmpoutdir}",
+                    f'nvbenjo.models.dummytorchmodel.type_or_path="{tmpfile.name}"',
+                ],
+            )
+            run_config(cfg)
+            _check_run_files(cfg)
 
 
 class ComplexDummyModelMultiInput(torch.nn.Module):
     def __init__(self, min, max):
-        super(ComplexDummyModelMultiInput, self).__init__()
+        super().__init__()
         self.fc1 = torch.nn.Linear(10, 1)
         self.fc2 = torch.nn.Linear(20, 1)
         self.min = min
@@ -296,51 +297,51 @@ def test_torch_load_complex_invalid_multiinput():
     max = 12
     model = ComplexDummyModelMultiInput(min=min, max=max)
 
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
-            torch.save(model, tmpfile)
-            with tempfile.TemporaryDirectory() as tmpoutdir:
-                config_override = {
-                    "nvbenjo": {
-                        "models": {
-                            "dummytorchmodel": {
-                                "type_or_path": tmpfile.name,
-                                "num_batches": 2,
-                                "batch_sizes": [1, 2],
-                                "devices": ["cpu"],
-                                "runtime_options": {
-                                    "FP32": {
-                                        "precision": "FP32",
-                                        "compile": False,
-                                        "enable_profiling": True,
-                                        "profiler_kwargs": {"record_shapes": True, "with_stack": True},
-                                    },
+    with (
+        initialize(version_base=None, config_path="conf"),
+        tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile,
+    ):
+        torch.save(model, tmpfile)
+        with tempfile.TemporaryDirectory() as tmpoutdir:
+            config_override = {
+                "nvbenjo": {
+                    "models": {
+                        "dummytorchmodel": {
+                            "type_or_path": tmpfile.name,
+                            "num_batches": 2,
+                            "batch_sizes": [1, 2],
+                            "devices": ["cpu"],
+                            "runtime_options": {
+                                "FP32": {
+                                    "precision": "FP32",
+                                    "compile": False,
+                                    "enable_profiling": True,
+                                    "profiler_kwargs": {"record_shapes": True, "with_stack": True},
                                 },
-                                "shape": [
-                                    {"name": "x", "shape": ["B", 10], "type": "float", "min_max": [max, max * 2]},
-                                    {"name": "y", "shape": ["B", 20], "type": "float", "min_max": [max, max * 2]},
-                                ],
-                            }
+                            },
+                            "shape": [
+                                {"name": "x", "shape": ["B", 10], "type": "float", "min_max": [max, max * 2]},
+                                {"name": "y", "shape": ["B", 20], "type": "float", "min_max": [max, max * 2]},
+                            ],
                         }
                     }
                 }
-                cfg = compose(
-                    config_name="default",
-                    overrides=[
-                        f"output_dir={tmpoutdir}",
-                    ],
-                )
-                # temporary disable struct mode to allow merging additional model
-                omegaconf.OmegaConf.set_struct(cfg, False)
-                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
-                omegaconf.OmegaConf.set_struct(cfg, True)
-                if isinstance(cfg, omegaconf.DictConfig):
-                    with pytest.raises(
-                        ValueError, match=f"Input x contains values outside the range \\[{min}, {max}\\]"
-                    ):
-                        run_config(cfg)
-                else:
-                    raise ValueError("Config is not a DictConfig instance")
+            }
+            cfg = compose(
+                config_name="default",
+                overrides=[
+                    f"output_dir={tmpoutdir}",
+                ],
+            )
+            # temporary disable struct mode to allow merging additional model
+            omegaconf.OmegaConf.set_struct(cfg, False)
+            cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+            omegaconf.OmegaConf.set_struct(cfg, True)
+            if isinstance(cfg, omegaconf.DictConfig):
+                with pytest.raises(ValueError, match=f"Input x contains values outside the range \\[{min}, {max}\\]"):
+                    run_config(cfg)
+            else:
+                raise TypeError("Config is not a DictConfig instance")
 
 
 @pytest.mark.parametrize("compile_mode", ["aot_compile", "torch_compile"])
@@ -379,41 +380,43 @@ def test_compile_modes(compile_mode, precision, extra_compile_kwargs, model_cls,
 
     model = model_cls()
 
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile:
-            torch.save(model, tmpfile)
-            with tempfile.TemporaryDirectory() as tmpoutdir:
-                config_override = {
-                    "nvbenjo": {
-                        "models": {
-                            "dummytorchmodel": {
-                                "type_or_path": tmpfile.name,
-                                "num_batches": 2,
-                                "batch_sizes": [1],
-                                "devices": ["cpu"],
-                                "runtime_options": {
-                                    precision: {
-                                        "precision": precision,
-                                        "compile": compile_mode,
-                                        "compile_kwargs": compile_kwargs,
-                                    },
+    with (
+        initialize(version_base=None, config_path="conf"),
+        tempfile.NamedTemporaryFile(delete=False, suffix=".pt") as tmpfile,
+    ):
+        torch.save(model, tmpfile)
+        with tempfile.TemporaryDirectory() as tmpoutdir:
+            config_override = {
+                "nvbenjo": {
+                    "models": {
+                        "dummytorchmodel": {
+                            "type_or_path": tmpfile.name,
+                            "num_batches": 2,
+                            "batch_sizes": [1],
+                            "devices": ["cpu"],
+                            "runtime_options": {
+                                precision: {
+                                    "precision": precision,
+                                    "compile": compile_mode,
+                                    "compile_kwargs": compile_kwargs,
                                 },
-                                "shape": shape,
-                            }
+                            },
+                            "shape": shape,
                         }
                     }
                 }
-                cfg = compose(
-                    config_name="default",
-                    overrides=[f"output_dir={tmpoutdir}"],
-                )
-                omegaconf.OmegaConf.set_struct(cfg, False)
-                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
-                omegaconf.OmegaConf.set_struct(cfg, True)
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=UserWarning)
-                    run_config(cfg)
-                _check_run_files(cfg)
+            }
+            cfg = compose(
+                config_name="default",
+                overrides=[f"output_dir={tmpoutdir}"],
+            )
+            omegaconf.OmegaConf.set_struct(cfg, False)
+            cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+            omegaconf.OmegaConf.set_struct(cfg, True)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                run_config(cfg)
+            _check_run_files(cfg)
 
 
 @pytest.mark.skipif(
@@ -428,64 +431,65 @@ def test_aot_prefix_loading():
         dynamic_shapes={"x": {0: batch_size_dim}, "y": {0: batch_size_dim}},
     )
 
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pt2") as tmpfile:
-            torch._inductor.aoti_compile_and_package(
-                program,
-                package_path=tmpfile.name,
-            )
-            with tempfile.TemporaryDirectory() as tmpoutdir:
-                config_override = {
-                    "nvbenjo": {
-                        "models": {
-                            "aotmodel": {
-                                "type_or_path": f"aot:{tmpfile.name}",
-                                "num_batches": 2,
-                                "batch_sizes": [1, 2],
-                                "devices": ["cpu"],
-                                "runtime_options": {
-                                    "FP32": {"precision": "FP32", "compile": False},
-                                },
-                                "shape": [["B", 10], ["B", 20]],
-                            }
+    with (
+        initialize(version_base=None, config_path="conf"),
+        tempfile.NamedTemporaryFile(delete=False, suffix=".pt2") as tmpfile,
+    ):
+        torch._inductor.aoti_compile_and_package(
+            program,
+            package_path=tmpfile.name,
+        )
+        with tempfile.TemporaryDirectory() as tmpoutdir:
+            config_override = {
+                "nvbenjo": {
+                    "models": {
+                        "aotmodel": {
+                            "type_or_path": f"aot:{tmpfile.name}",
+                            "num_batches": 2,
+                            "batch_sizes": [1, 2],
+                            "devices": ["cpu"],
+                            "runtime_options": {
+                                "FP32": {"precision": "FP32", "compile": False},
+                            },
+                            "shape": [["B", 10], ["B", 20]],
                         }
                     }
                 }
-                cfg = compose(
-                    config_name="default",
-                    overrides=[f"output_dir={tmpoutdir}"],
-                )
-                omegaconf.OmegaConf.set_struct(cfg, False)
-                cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
-                omegaconf.OmegaConf.set_struct(cfg, True)
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=UserWarning)
-                    run_config(cfg)
-                _check_run_files(cfg)
+            }
+            cfg = compose(
+                config_name="default",
+                overrides=[f"output_dir={tmpoutdir}"],
+            )
+            omegaconf.OmegaConf.set_struct(cfg, False)
+            cfg = omegaconf.OmegaConf.merge(cfg, omegaconf.OmegaConf.create(config_override))
+            omegaconf.OmegaConf.set_struct(cfg, True)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                run_config(cfg)
+            _check_run_files(cfg)
 
 
 def test_cli_cn_path_arg():
-    with initialize(version_base=None, config_path="conf"):
-        with tempfile.TemporaryDirectory() as cfg_tmpdir:
-            cfg_file = os.path.join(cfg_tmpdir, "smallasdf.yaml")
-            shutil.copy2(os.path.join("tests", "conf", "small_single.yaml"), cfg_file)
-            with tempfile.TemporaryDirectory() as tmpdir:
-                subprocess.run(
-                    [
-                        "python",
-                        "-m",
-                        "nvbenjo.cli",
-                        "-cn",
-                        cfg_file,
-                        f"output_dir={tmpdir}",
-                    ],
-                    check=True,
-                )
+    with initialize(version_base=None, config_path="conf"), tempfile.TemporaryDirectory() as cfg_tmpdir:
+        cfg_file = os.path.join(cfg_tmpdir, "smallasdf.yaml")
+        shutil.copy2(os.path.join("tests", "conf", "small_single.yaml"), cfg_file)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            subprocess.run(
+                [
+                    "python",
+                    "-m",
+                    "nvbenjo.cli",
+                    "-cn",
+                    cfg_file,
+                    f"output_dir={tmpdir}",
+                ],
+                check=True,
+            )
 
-                cfg = compose(
-                    config_name="small_single",
-                    overrides=[
-                        f"output_dir={tmpdir}",
-                    ],
-                )
-                _check_run_files(cfg)
+            cfg = compose(
+                config_name="small_single",
+                overrides=[
+                    f"output_dir={tmpdir}",
+                ],
+            )
+            _check_run_files(cfg)

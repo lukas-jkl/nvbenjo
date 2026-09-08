@@ -3,16 +3,16 @@ from __future__ import annotations
 import os
 import threading
 import time
-from contextlib import contextmanager
 import typing as ty
+from contextlib import contextmanager
+from enum import Enum
+
 import pandas as pd
 import pynvml
-from enum import Enum
-from omegaconf.listconfig import ListConfig
-from omegaconf.dictconfig import DictConfig
-
-from rich.progress import Progress
 import torch
+from omegaconf.dictconfig import DictConfig
+from omegaconf.listconfig import ListConfig
+from rich.progress import Progress
 
 BATCH_SIZE_IDENTIFIERS = ("B", "batch_size")
 TRANSFER_WARNING = (
@@ -23,7 +23,7 @@ SingleShape = tuple[int | str, ...] | dict[str, ty.Any]
 MultiShape = tuple[SingleShape, ...]
 Shape = SingleShape | MultiShape
 TensorLike = torch.Tensor | tuple[torch.Tensor, ...] | dict[str, torch.Tensor]
-ProviderType = ty.Union[str, ty.Tuple[str, dict[ty.Any, ty.Any]]]
+ProviderType = str | tuple[str, dict[ty.Any, ty.Any]]
 
 EXAMPLE_VALID_SHAPES: list[Shape] = [
     ("B", 3, 224, 224),
@@ -61,7 +61,7 @@ class CompileMode(Enum):
     NONE = "none"
 
 
-def format_num(num: ty.Union[int, float], bytes: bool = False) -> ty.Union[str, None]:
+def format_num(num: float, bytes: bool = False) -> str | None:
     """Scale bytes to its proper format, e.g. 1253656 => '1.20MB'"""
     if num is None:
         return num
@@ -86,7 +86,7 @@ def format_seconds(time_seconds: float) -> str:
 
 
 def _get_rnd(
-    shape_tuple: tuple[int], dtype: ty.Optional[str], min_val: int, max_val: int, value: ty.Optional[ty.Any] = None
+    shape_tuple: tuple[int], dtype: str | None, min_val: int, max_val: int, value: ty.Any | None = None
 ) -> torch.Tensor:
     if dtype is None or any(s in dtype for s in ["float", "double"]):
         dtype = dtype if dtype is not None else "float32"
@@ -117,10 +117,10 @@ def _check_shape_dict(si: dict | DictConfig) -> None:
         raise ValueError("The 'dtype' is not valid. Did you mean 'type'?")
     if "shape" not in si:
         raise ValueError(f"The shape definition {si} must contain a 'shape' key.")
-    for k in si.keys():
+    for k in si:
         if k not in ["name", "type", "shape", "min_max", "value"]:
             raise ValueError(f"Invalid key {k} in shape definition {si}.")
-    if "min_max" in si.keys() and "value" in si.keys():
+    if "min_max" in si and "value" in si:
         raise ValueError(f"Invalid shape definition {si} can only specify min_max or value.")
 
 
@@ -150,7 +150,7 @@ def get_rnd_from_shape_s(
             for si in shape:
                 # check is redundant but helps type checker
                 if not isinstance(si, (dict, DictConfig)):
-                    raise ValueError(f"Shape item {si} must be of type dict.")
+                    raise TypeError(f"Shape item {si} must be of type dict.")
 
                 # name='input', type='float', shape=['B', 320000, 1], min_max=(0, 1)
                 _check_shape_dict(si)
@@ -166,10 +166,8 @@ def get_rnd_from_shape_s(
                 )
         else:
             raise ValueError(
-                (
-                    f"Invalid shape {shape}.\n "
-                    "Example valid inputs:\n " + "\n - ".join([str(s) for s in EXAMPLE_VALID_SHAPES])
-                )
+                f"Invalid shape {shape}.\n "
+                "Example valid inputs:\n " + "\n - ".join([str(s) for s in EXAMPLE_VALID_SHAPES])
             )
 
         if not depends_on_batch:
@@ -177,8 +175,8 @@ def get_rnd_from_shape_s(
                 f"Shape {shape} does not depend on batch size. "
                 f"Please ensure that the shape contains an identifier for the batch size: {BATCH_SIZE_IDENTIFIERS}."
             )
-    except NoBatchShapeError as e:
-        raise e
+    except NoBatchShapeError:
+        raise
     except Exception as e:
         raise ValueError(
             f"Failed to generate random input from shape {shape} with batch size {batch_size}. "
@@ -211,7 +209,7 @@ def calculate_batchmetrics(results: pd.DataFrame, custom_batchmetrics: dict[str,
 
 
 @contextmanager
-def progress_task(progress: ty.Optional[Progress], task_name: str, **kwargs):
+def progress_task(progress: Progress | None, task_name: str, **kwargs):
     if progress is None:
         yield None
     else:
