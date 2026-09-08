@@ -3,8 +3,8 @@ from tempfile import TemporaryDirectory
 
 import pytest
 import torch
-import torch.nn as nn
 from packaging.version import Version
+from torch import nn
 
 from nvbenjo import benchmark, cfg
 from nvbenjo.utils import PrecisionType

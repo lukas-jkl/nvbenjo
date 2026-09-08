@@ -1,6 +1,6 @@
 import os
-import time
 import threading
+import time
 import typing as ty
 
 from .cfg import OnnxRuntimeConfig
@@ -17,7 +17,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from . import console
 from .torch_utils import transfer_to_device
-from .utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, _check_shape_dict, get_rnd_from_shape_s, Shape
+from .utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, Shape, _check_shape_dict, get_rnd_from_shape_s
 
 
 def get_model(
@@ -41,8 +41,7 @@ def get_model(
     ort.InferenceSession
         Loaded ONNX InferenceSession.
     """
-    if type_or_path.startswith("onnx:"):
-        type_or_path = type_or_path[len("onnx:") :]
+    type_or_path = type_or_path.removeprefix("onnx:")
     type_or_path = os.path.expanduser(type_or_path)
     if not type_or_path.endswith(".onnx") or not os.path.isfile(type_or_path):
         raise ValueError(f"Invalid model {type_or_path}. Must be a valid ONNX path ending with .onnx")
@@ -187,14 +186,11 @@ def get_rnd_input_batch(onnx_session_inputs, shape: Shape, batch_size: int) -> d
                 si["shape"] = onnx_inputs_by_name[si["name"]].shape
     else:
         raise ValueError(
-            (
-                f"Invalid shape {shape}.\n "
-                "Example valid inputs:\n " + "\n - ".join([str(s) for s in EXAMPLE_VALID_SHAPES])
-            )
+            f"Invalid shape {shape}.\n Example valid inputs:\n " + "\n - ".join([str(s) for s in EXAMPLE_VALID_SHAPES])
         )
     batch, _ = get_rnd_from_shape_s(shape=rnd_shape, batch_size=batch_size)
     if not isinstance(batch, dict):
-        raise ValueError("Internal Error was unable to generate dict of inputs for ONNX model.")
+        raise TypeError("Internal Error was unable to generate dict of inputs for ONNX model.")
     return batch  # type: ignore
 
 
@@ -205,7 +201,7 @@ def measure_repeated_inference_timing(
     model_device: torch.device,
     transfer_to_device_fn: ty.Callable = transfer_to_device,
     num_runs: int = 100,
-    progress_callback: ty.Optional[ty.Callable] = None,
+    progress_callback: ty.Callable | None = None,
 ) -> pd.DataFrame:
     """Measure inference times.
 
@@ -281,7 +277,7 @@ def measure_repeated_inference_timing(
                     buffer_ptr=input.data_ptr(),
                 )
         else:
-            raise ValueError(f"Invalid input type {type(device_sample)}. Must be one of list, tuple, dict")
+            raise TypeError(f"Invalid input type {type(device_sample)}. Must be one of list, tuple, dict")
 
         device_result = []
         for i, output in enumerate(onnx_model_outputs):
@@ -310,7 +306,7 @@ def measure_repeated_inference_timing(
 
         try:
             transfer_to_device_fn(device_result, torch.device("cpu"))
-        except Exception:
+        except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
             console.print(TRANSFER_WARNING)
         stop_on_cpu = time.perf_counter()
 

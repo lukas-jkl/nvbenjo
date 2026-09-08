@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 from platform import uname
 from typing import Any
-import logging
 
+import psutil
 import pynvml
 from cpuinfo import get_cpu_info
-import psutil
 
 from .utils import format_num
 

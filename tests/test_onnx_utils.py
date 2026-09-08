@@ -1,4 +1,3 @@
-import typing as ty
 from dataclasses import dataclass
 
 import pytest
@@ -18,7 +17,7 @@ from nvbenjo.cfg import OnnxRuntimeConfig
 class FakeOnnxInput:
     name: str
     type: str
-    shape: list[ty.Union[int, str]]
+    shape: list[int | str]
 
 
 def test_get_model():
