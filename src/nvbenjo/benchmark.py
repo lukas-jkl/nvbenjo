@@ -140,6 +140,7 @@ def _get_progress_bar() -> Progress:
     )
 
 
+@torch.no_grad()
 def _run_warmup(
     model: nn.Module | Callable,
     batch: utils.TensorLike,
