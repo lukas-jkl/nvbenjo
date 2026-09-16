@@ -4,6 +4,7 @@ import logging
 import time
 import typing as ty
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
 import numpy as np
@@ -409,8 +410,9 @@ def benchmark_model(
                         torch_memory_alloc = 0
                         gpu_memory_alloc = 0
                     if runtime_cfg.enable_profiling:
-                        if "activities" not in runtime_cfg.profiler_kwargs:
-                            runtime_cfg.profiler_kwargs["activities"] = (
+                        profiler_kwargs = dict(runtime_cfg.profiler_kwargs)
+                        if "activities" not in profiler_kwargs:
+                            profiler_kwargs["activities"] = (
                                 [
                                     torch.profiler.ProfilerActivity.CPU,
                                     torch.profiler.ProfilerActivity.CUDA,
@@ -418,29 +420,28 @@ def benchmark_model(
                                 if device.type == "cuda"
                                 else [torch.profiler.ProfilerActivity.CPU]
                             )
-                        profiler = torch.profiler.profile(
-                            **runtime_cfg.profiler_kwargs,
+                        profiler_ctxt: AbstractContextManager[torch.profiler.profile | None] = torch.profiler.profile(
+                            **profiler_kwargs,
                         )
-                        profiler.start()
                     else:
-                        profiler = None
+                        profiler_ctxt = nullcontext()
                     if isinstance(model, torch_utils._CudaGraphedModel):
                         transfer_fn = model.transfer_to_device
                     else:
                         transfer_fn = torch_utils.transfer_to_device
-                    cur_results = _measure_timings(
-                        model=model,
-                        batch=batch,
-                        batch_size=batch_size,
-                        device=device,
-                        num_batches=model_cfg.num_batches,
-                        progress_bar=progress_bar,
-                        timing_function=functools.partial(
-                            torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn
-                        ),
-                    )
+                    with profiler_ctxt as profiler:
+                        cur_results = _measure_timings(
+                            model=model,
+                            batch=batch,
+                            batch_size=batch_size,
+                            device=device,
+                            num_batches=model_cfg.num_batches,
+                            progress_bar=progress_bar,
+                            timing_function=functools.partial(
+                                torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn
+                            ),
+                        )
                     if profiler is not None:
-                        profiler.stop()
                         time_str = time.strftime("%Y-%m-%d_%H-%M-%S")
                         profiler.export_chrome_trace(
                             f"{runtime_cfg.profiling_prefix}_{device}_{batch_size}_{time_str}.json"
