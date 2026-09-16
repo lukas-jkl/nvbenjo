@@ -4,7 +4,7 @@ import os
 import threading
 import time
 import typing as ty
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from enum import Enum
 
 import pandas as pd
@@ -218,6 +218,14 @@ def progress_task(progress: Progress | None, task_name: str, **kwargs):
             yield task
         finally:
             progress.remove_task(task)
+
+
+def device_ctxt(device: torch.device) -> AbstractContextManager[None]:
+    """Make ``device`` the current CUDA device for the enclosed block.
+    """
+    if device.type != "cuda":
+        return nullcontext()
+    return torch.cuda.device(device)
 
 
 def sample_gpu_memory(

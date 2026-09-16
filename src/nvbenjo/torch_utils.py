@@ -28,7 +28,15 @@ from rich.progress import Progress
 from nvbenjo import console
 from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
 from nvbenjo.torch_ops import *
-from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task, sample_gpu_memory
+from nvbenjo.utils import (
+    AMP_PREFIX,
+    TRANSFER_WARNING,
+    PrecisionType,
+    TensorLike,
+    device_ctxt,
+    progress_task,
+    sample_gpu_memory,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -369,23 +377,24 @@ def measure_repeated_inference_timing(
         start_on_cpu = time.perf_counter()
         device_sample = transfer_to_device_fn(sample, model_device)
 
-        if model_device.type == "cuda":
-            start_event = torch.cuda.Event(enable_timing=True)
-            stop_event = torch.cuda.Event(enable_timing=True)
-            start_event.record()  # For GPU timing
-        start_on_device = time.perf_counter()  # For CPU timing
+        with device_ctxt(model_device):
+            if model_device.type == "cuda":
+                start_event = torch.cuda.Event(enable_timing=True)
+                stop_event = torch.cuda.Event(enable_timing=True)
+                start_event.record()  # For GPU timing
+            start_on_device = time.perf_counter()  # For CPU timing
 
-        device_result = run_model_with_input(model, device_sample)
+            device_result = run_model_with_input(model, device_sample)
 
-        if model_device.type == "cuda":
-            stop_event.record()
-            torch.cuda.synchronize()
-            # elapsed_on_device = stop_event.elapsed_time(start_event)
-            elapsed_on_device = start_event.elapsed_time(stop_event) / 1000.0
-            stop_on_device = time.perf_counter()
-        else:
-            stop_on_device = time.perf_counter()
-            elapsed_on_device = stop_on_device - start_on_device
+            if model_device.type == "cuda":
+                stop_event.record()
+                stop_event.synchronize()
+                # elapsed_on_device = stop_event.elapsed_time(start_event)
+                elapsed_on_device = start_event.elapsed_time(stop_event) / 1000.0
+                stop_on_device = time.perf_counter()
+            else:
+                stop_on_device = time.perf_counter()
+                elapsed_on_device = stop_on_device - start_on_device
 
         try:
             transfer_to_device_fn(device_result, torch.device("cpu"))
