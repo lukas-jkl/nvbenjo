@@ -221,8 +221,7 @@ def progress_task(progress: Progress | None, task_name: str, **kwargs):
 
 
 def device_ctxt(device: torch.device) -> AbstractContextManager[None]:
-    """Make ``device`` the current CUDA device for the enclosed block.
-    """
+    """Make ``device`` the current CUDA device for the enclosed block."""
     if device.type != "cuda":
         return nullcontext()
     return torch.cuda.device(device)
