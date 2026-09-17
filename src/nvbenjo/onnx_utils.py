@@ -272,7 +272,7 @@ def measure_repeated_inference_timing(
                     name=name,
                     device_type=model_device.type,
                     device_id=device_id,
-                    element_type=str(input.dtype).strip("torch."),
+                    element_type=str(input.dtype).removeprefix("torch."),
                     shape=input.shape,
                     buffer_ptr=input.data_ptr(),
                 )
@@ -287,7 +287,7 @@ def measure_repeated_inference_timing(
                 name=output.name,
                 device_type=model_device.type,
                 device_id=device_id,
-                element_type=str(output_tensor.dtype).strip("torch."),
+                element_type=str(output_tensor.dtype).removeprefix("torch."),
                 shape=output_tensor.shape,
                 buffer_ptr=output_tensor.data_ptr(),
             )

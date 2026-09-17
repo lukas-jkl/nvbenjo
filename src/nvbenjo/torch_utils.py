@@ -83,7 +83,7 @@ def get_model(
         if verbose and console is not None:
             console.print(f"Loading jit model {type_or_path}")
         type_or_path = type_or_path[len("jit:") :]
-        return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
+        return torch.jit.load(os.path.expanduser(type_or_path), map_location=device).eval()
     elif type_or_path.startswith("torchexport:"):
         if verbose and console is not None:
             console.print(f"Loading torchexport model {type_or_path}")
@@ -104,7 +104,7 @@ def get_model(
             return model
         except Exception:  # noqa: BLE001 - unknown checkpoint format, try the next loader
             try:
-                return torch.jit.load(os.path.expanduser(type_or_path), map_location=device)
+                return torch.jit.load(os.path.expanduser(type_or_path), map_location=device).eval()
             except Exception:
                 if Version(torch.__version__) > Version("2.1"):
                     try:
@@ -122,7 +122,7 @@ def get_model(
             console.print(f"Loading huggingface model {type_or_path}")
         from transformers import AutoModel  # type: ignore
 
-        return AutoModel.from_pretrained(os.path.expanduser(type_or_path)).to(device)
+        return AutoModel.from_pretrained(os.path.expanduser(type_or_path)).to(device).eval()
     elif type_or_path.startswith("torchvision:"):
         type_or_path = type_or_path[len("torchvision:") :]
         available_torchvision_models = torchvision.models.list_models()
@@ -277,6 +277,7 @@ def get_model_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 
+@torch.no_grad()
 def measure_gpu_memory_allocation(
     model: nn.Module | Callable, batch: TensorLike, device: torch.device, iterations: int = 3
 ) -> tuple[int, int]:
@@ -339,6 +340,7 @@ def measure_gpu_memory_allocation(
     return torch_memory, gpu_memory
 
 
+@torch.no_grad()
 def measure_repeated_inference_timing(
     model: nn.Module,
     sample: TensorLike,

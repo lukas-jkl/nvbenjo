@@ -5,6 +5,7 @@ import torch
 from packaging.version import Version
 from torch import nn
 
+from nvbenjo.benchmark import _run_warmup
 from nvbenjo.cfg import TorchRuntimeConfig
 from nvbenjo.torch_utils import (
     _aoti_load_kwargs,
@@ -13,6 +14,8 @@ from nvbenjo.torch_utils import (
     get_amp_ctxt_for_precision,
     get_model,
     get_model_parameters,
+    measure_gpu_memory_allocation,
+    measure_repeated_inference_timing,
     run_model_with_input,
 )
 from nvbenjo.utils import CompileMode, PrecisionType
@@ -200,3 +203,65 @@ def test_load_exported_module_runs_on_other_device(tmp_path):
     module = get_model(f"torchexport:{path}", device=meta, runtime_config=TorchRuntimeConfig())
     out = module(torch.randn(2, 4, device=meta))
     assert out.device == meta
+
+
+class _GradProbe(nn.Module):
+    """Records whether autograd was active for each forward pass."""
+
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Linear(10, 10)
+        self.grad_enabled = []
+        self.output_requires_grad = []
+
+    def forward(self, x):
+        out = self.fc(x)
+        self.grad_enabled.append(torch.is_grad_enabled())
+        self.output_requires_grad.append(out.requires_grad)
+        return out
+
+
+def test_inference_runs_without_autograd():
+    device = torch.device("cpu")
+    batch = torch.randn(4, 10)
+
+    model = _GradProbe()
+    # parameters require grad, so without a no_grad guard every forward builds a graph
+    assert all(p.requires_grad for p in model.parameters())
+
+    _run_warmup(model, batch, device, num_warmup_batches=2, progress_bar=None)
+    measure_gpu_memory_allocation(model, batch, device, iterations=2)
+    measure_repeated_inference_timing(model, batch, batch_size=4, model_device=device, num_runs=2)
+
+    assert len(model.grad_enabled) == 6
+    assert not any(model.grad_enabled)
+    assert not any(model.output_requires_grad)
+
+
+class _BatchNormModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bn = nn.BatchNorm2d(3)
+
+    def forward(self, x):
+        return self.bn(x)
+
+
+def test_get_model_returns_eval_mode_torchvision():
+    model = get_model(
+        "torchvision:resnet18", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig(), weights=None
+    )
+    assert not model.training
+
+
+def test_get_model_returns_eval_mode_saved_models(tmp_path):
+    runtime_config = TorchRuntimeConfig()
+    device = torch.device("cpu")
+
+    torch_path = tmp_path / "model.pth"
+    torch.save(_BatchNormModel().train(), torch_path)
+    assert not get_model(str(torch_path), device=device, runtime_config=runtime_config).training
+
+    jit_path = tmp_path / "model.jit"
+    torch.jit.save(torch.jit.script(_BatchNormModel().train()), jit_path)
+    assert not get_model(str(jit_path), device=device, runtime_config=runtime_config).training
