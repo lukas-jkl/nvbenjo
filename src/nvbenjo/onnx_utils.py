@@ -191,7 +191,7 @@ def get_rnd_input_batch(onnx_session_inputs, shape: Shape, batch_size: int) -> d
     batch, _ = get_rnd_from_shape_s(shape=rnd_shape, batch_size=batch_size)
     if not isinstance(batch, dict):
         raise TypeError("Internal Error was unable to generate dict of inputs for ONNX model.")
-    return batch  # type: ignore
+    return batch
 
 
 def measure_repeated_inference_timing(
