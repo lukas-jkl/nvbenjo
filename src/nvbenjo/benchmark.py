@@ -1,10 +1,12 @@
 import functools
+import gc
 import itertools
 import logging
 import math
 import time
 import typing as ty
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
 import pandas as pd
@@ -140,6 +142,7 @@ def _get_progress_bar() -> Progress:
     )
 
 
+@torch.no_grad()
 def _run_warmup(
     model: nn.Module | Callable,
     batch: utils.TensorLike,
@@ -309,7 +312,7 @@ def benchmark_model(
     """
     results = []
     num_model_parameters = None
-    precision_batch_oom = {}
+    precision_batch_oom: dict[tuple[str, str], int] = {}
 
     if progress_bar is None:
         progress_bar = _get_progress_bar()
@@ -321,10 +324,13 @@ def benchmark_model(
     )
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
     for device_str, batch_size, (runtime_option_name, runtime_cfg) in iter_cfgs:
-        if precision_batch_oom.get(runtime_option_name, math.inf) < batch_size:
-            # already went oom for these runtime options with smaller batch size -> skip bigger one
+        if precision_batch_oom.get((device_str, runtime_option_name), math.inf) < batch_size:
+            # already went oom for these runtime options on this device with a smaller batch size
+            # -> skip the bigger one
             progress_bar.advance(bench_task)
             continue
+        model: Any = None
+        batch: utils.TensorLike | None = None
         try:
             device = _get_device(runtime_cfg, device_str, console)
             progress_bar.update(
@@ -334,7 +340,6 @@ def benchmark_model(
             model = load_model(model_cfg.type_or_path, device=device, runtime_config=runtime_cfg, **model_cfg.kwargs)
             if isinstance(model_cfg, TorchModelConfig):
                 assert isinstance(runtime_cfg, TorchRuntimeConfig)
-                batch: utils.TensorLike
                 batch, set_dtype = utils.get_rnd_from_shape_s(shape=model_cfg.shape, batch_size=batch_size)
 
                 if num_model_parameters is None:
@@ -409,8 +414,9 @@ def benchmark_model(
                         torch_memory_alloc = 0
                         gpu_memory_alloc = 0
                     if runtime_cfg.enable_profiling:
-                        if "activities" not in runtime_cfg.profiler_kwargs:
-                            runtime_cfg.profiler_kwargs["activities"] = (
+                        profiler_kwargs = dict(runtime_cfg.profiler_kwargs)
+                        if "activities" not in profiler_kwargs:
+                            profiler_kwargs["activities"] = (
                                 [
                                     torch.profiler.ProfilerActivity.CPU,
                                     torch.profiler.ProfilerActivity.CUDA,
@@ -418,29 +424,28 @@ def benchmark_model(
                                 if device.type == "cuda"
                                 else [torch.profiler.ProfilerActivity.CPU]
                             )
-                        profiler = torch.profiler.profile(
-                            **runtime_cfg.profiler_kwargs,
+                        profiler_ctxt: AbstractContextManager[torch.profiler.profile | None] = torch.profiler.profile(
+                            **profiler_kwargs,
                         )
-                        profiler.start()
                     else:
-                        profiler = None
+                        profiler_ctxt = nullcontext()
                     if isinstance(model, torch_utils._CudaGraphedModel):
                         transfer_fn = model.transfer_to_device
                     else:
                         transfer_fn = torch_utils.transfer_to_device
-                    cur_results = _measure_timings(
-                        model=model,
-                        batch=batch,
-                        batch_size=batch_size,
-                        device=device,
-                        num_batches=model_cfg.num_batches,
-                        progress_bar=progress_bar,
-                        timing_function=functools.partial(
-                            torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn
-                        ),
-                    )
+                    with profiler_ctxt as profiler:
+                        cur_results = _measure_timings(
+                            model=model,
+                            batch=batch,
+                            batch_size=batch_size,
+                            device=device,
+                            num_batches=model_cfg.num_batches,
+                            progress_bar=progress_bar,
+                            timing_function=functools.partial(
+                                torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn
+                            ),
+                        )
                     if profiler is not None:
-                        profiler.stop()
                         time_str = time.strftime("%Y-%m-%d_%H-%M-%S")
                         profiler.export_chrome_trace(
                             f"{runtime_cfg.profiling_prefix}_{device}_{batch_size}_{time_str}.json"
@@ -469,10 +474,6 @@ def benchmark_model(
             else:
                 raise TypeError(f"Unknown model config type {type(model_cfg)}")
 
-            del model
-            del batch
-            torch.cuda.empty_cache()
-
             cur_results["torch_memory_bytes"] = torch_memory_alloc
             cur_results["gpu_memory_bytes"] = gpu_memory_alloc
             cur_results["model"] = model_cfg.name
@@ -482,20 +483,25 @@ def benchmark_model(
             results.append(cur_results)
         except torch.cuda.OutOfMemoryError:
             console.print(
-                f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {device!s}[/red]"
+                f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {device_str}[/red]"
             )
-            precision_batch_oom[runtime_option_name] = batch_size
+            precision_batch_oom[(device_str, runtime_option_name)] = batch_size
             continue
         except Exception as e:
             if "Failed to allocate memory" in str(e) or "ALLOC_FAILED" in str(e):
                 console.print(
-                    f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {device!s}[/red]"
+                    f"[red]Out of memory for batch size {batch_size} and runtime_options {runtime_option_name} on device {device_str}[/red]"
                 )
-                precision_batch_oom[runtime_option_name] = batch_size
+                precision_batch_oom[(device_str, runtime_option_name)] = batch_size
                 continue
             else:
                 raise
         finally:
+            del model
+            del batch
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             progress_bar.advance(bench_task)
 
     if progress_bar is not None:
