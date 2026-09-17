@@ -11,15 +11,24 @@ def _make_search_path():
     return search_path
 
 
-def test_search_path_user_before_builtin(monkeypatch):
-    """User configs (CWD) should take priority over built-in package configs."""
-    monkeypatch.setattr("sys.argv", ["nvbenjo", "-cn", "small.yaml"])
+def _chdir_to_config_dir(monkeypatch, tmp_path):
+    """CWD is only added to the search path when it actually holds configs."""
+    (tmp_path / "myconfig.yaml").write_text("")
+    monkeypatch.chdir(tmp_path)
 
+
+def _providers(monkeypatch, argv):
+    monkeypatch.setattr("sys.argv", argv)
     search_path = _make_search_path()
-    plugin = NvbenjoSearchPathPlugin()
-    plugin.manipulate_search_path(search_path)
+    NvbenjoSearchPathPlugin().manipulate_search_path(search_path)
+    return [el.provider for el in search_path.get_path()]
 
-    providers = [el.provider for el in search_path.get_path()]
+
+def test_search_path_user_before_builtin(monkeypatch, tmp_path):
+    """User configs (CWD) should take priority over built-in package configs."""
+    _chdir_to_config_dir(monkeypatch, tmp_path)
+    providers = _providers(monkeypatch, ["nvbenjo", "-cn", "small.yaml"])
+
     # CWD must come before both "main" and "nvbenjo-plugin" (the built-in paths)
     assert providers.index("nvbenjo-user") < providers.index("main")
     assert providers.index("nvbenjo-user") < providers.index("nvbenjo-plugin")
@@ -29,18 +38,34 @@ def test_search_path_user_before_builtin(monkeypatch):
     assert "nvbenjo-user-cd" not in providers
 
 
-def test_search_path_config_dir_before_builtin(monkeypatch):
+def test_search_path_config_dir_before_builtin(monkeypatch, tmp_path):
     """When -cd is used (e.g. via _fix_config_path), that dir must also take priority."""
-    monkeypatch.setattr("sys.argv", ["nvbenjo", "-cn", "small.yaml", "-cd", "/tmp/testcfg"])
+    _chdir_to_config_dir(monkeypatch, tmp_path)
+    providers = _providers(monkeypatch, ["nvbenjo", "-cn", "small.yaml", "-cd", "/tmp/testcfg"])
 
-    search_path = _make_search_path()
-    plugin = NvbenjoSearchPathPlugin()
-    plugin.manipulate_search_path(search_path)
-
-    providers = [el.provider for el in search_path.get_path()]
     # -cd path must come before CWD, "main", and "nvbenjo-plugin"
     assert providers.index("nvbenjo-user-cd") < providers.index("nvbenjo-user")
     assert providers.index("nvbenjo-user-cd") < providers.index("main")
     assert providers.index("nvbenjo-user-cd") < providers.index("nvbenjo-plugin")
     # But after Hydra's own internals
+    assert providers.index("hydra") < providers.index("nvbenjo-user-cd")
+
+
+def test_search_path_skips_cwd_without_configs(monkeypatch, tmp_path):
+    """A CWD without configs is left off the search path, so Hydra does not walk it."""
+    monkeypatch.chdir(tmp_path)
+    providers = _providers(monkeypatch, ["nvbenjo", "-cn", "small.yaml"])
+
+    assert "nvbenjo-user" not in providers
+    assert providers.index("main") < providers.index("nvbenjo-plugin")
+
+
+def test_search_path_config_dir_without_cwd_configs(monkeypatch, tmp_path):
+    """-cd must still take priority when CWD holds no configs."""
+    monkeypatch.chdir(tmp_path)
+    providers = _providers(monkeypatch, ["nvbenjo", "-cn", "small.yaml", "-cd", "/tmp/testcfg"])
+
+    assert "nvbenjo-user" not in providers
+    assert providers.index("nvbenjo-user-cd") < providers.index("main")
+    assert providers.index("nvbenjo-user-cd") < providers.index("nvbenjo-plugin")
     assert providers.index("hydra") < providers.index("nvbenjo-user-cd")

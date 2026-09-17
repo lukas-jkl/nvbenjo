@@ -493,3 +493,14 @@ def test_cli_cn_path_arg():
                 ],
             )
             _check_run_files(cfg)
+
+
+def test_cli_help():
+    result = subprocess.run(
+        ["python", "-m", "nvbenjo.cli", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "== Nvbenjo ==" in result.stdout, f"Help header missing, got: {result.stdout}"
+    assert "For more examples, see: nvbenjo/conf/" in result.stdout, f"Help footer missing, got: {result.stdout}"

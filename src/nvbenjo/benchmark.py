@@ -2,13 +2,13 @@ import functools
 import gc
 import itertools
 import logging
+import math
 import time
 import typing as ty
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
-import numpy as np
 import pandas as pd
 import torch
 from rich import progress
@@ -324,7 +324,7 @@ def benchmark_model(
     )
     bench_task = progress_bar.add_task("Running Benchmark", total=len(iter_cfgs))
     for device_str, batch_size, (runtime_option_name, runtime_cfg) in iter_cfgs:
-        if precision_batch_oom.get((device_str, runtime_option_name), np.inf) < batch_size:
+        if precision_batch_oom.get((device_str, runtime_option_name), math.inf) < batch_size:
             # already went oom for these runtime options on this device with a smaller batch size
             # -> skip the bigger one
             progress_bar.advance(bench_task)
