@@ -19,12 +19,6 @@ from packaging.version import Version
 from torch import nn
 
 try:
-    # move_to_device_pass is only available from PyTorch 2.5 on.
-    from torch.export.passes import move_to_device_pass
-except ImportError:
-    move_to_device_pass = None  # type: ignore[assignment]
-
-try:
     # PyTorch's aoti_load_package reaches for torch._inductor.codecache without
     # importing it, so register the attribute up front when available.
     import torch._inductor.codecache
@@ -152,7 +146,9 @@ def _load_exported_module(path: str, device: torch.device) -> nn.Module:
     behind; ``move_to_device_pass`` moves both, but only exists from PyTorch 2.5 on.
     """
     program = torch.export.load(path)
-    if move_to_device_pass is None:
+    try:
+        from torch.export.passes import move_to_device_pass
+    except ImportError:
         return program.module().to(device)
     return move_to_device_pass(program, device).module()
 
