@@ -2,11 +2,13 @@ from contextlib import nullcontext
 
 import pytest
 import torch
+from packaging.version import Version
 from torch import nn
 
 from nvbenjo.benchmark import _run_warmup
 from nvbenjo.cfg import TorchRuntimeConfig
 from nvbenjo.torch_utils import (
+    _aoti_load_kwargs,
     apply_batch_precision,
     apply_non_amp_model_precision,
     get_amp_ctxt_for_precision,
@@ -145,6 +147,63 @@ def test_run_model_with_input_dict_as_single_arg():
     assert torch.equal(out, torch.tensor([3.0]))
 
 
+class _ConstAttrModel(nn.Module):
+    """Plain tensor attribute -> torch.export lifts it into a constant."""
+
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Linear(4, 4, bias=False)
+        self.offset = torch.arange(4, dtype=torch.float32)
+
+    def forward(self, x):
+        return self.fc(x) + self.offset
+
+
+requires_move_to_device_pass = pytest.mark.skipif(
+    Version(torch.__version__) < Version("2.5"), reason="move_to_device_pass requires PyTorch 2.5+"
+)
+
+
+@requires_move_to_device_pass
+def test_load_exported_module_puts_constants_on_device(tmp_path):
+    program = torch.export.export(_ConstAttrModel().eval(), (torch.randn(2, 4),))
+    path = tmp_path / "model.pt2"
+    torch.export.save(program, str(path))
+
+    meta = torch.device("meta")
+    module = get_model(f"torchexport:{path}", device=meta, runtime_config=TorchRuntimeConfig())
+
+    devices = {t.device for t in list(module.parameters()) + list(module.buffers())}
+    devices |= {v.device for sub in module.modules() for v in sub.__dict__.values() if isinstance(v, torch.Tensor)}
+    assert devices == {meta}
+
+
+@pytest.mark.skipif(
+    Version(torch.__version__) < Version("2.8"), reason="aoti_load_package device_index requires PyTorch 2.8+"
+)
+def test_aoti_load_kwargs_pins_cuda_device_index():
+    kwargs = _aoti_load_kwargs(torch.device("cuda:1"), run_single_threaded=True)
+    assert kwargs == {"run_single_threaded": True, "device_index": 1}
+
+
+def test_aoti_load_kwargs_without_device_index():
+    assert _aoti_load_kwargs(torch.device("cuda"), run_single_threaded=None) == {}
+    assert _aoti_load_kwargs(torch.device("cpu"), run_single_threaded=True) == {"run_single_threaded": True}
+
+
+@requires_move_to_device_pass
+def test_load_exported_module_runs_on_other_device(tmp_path):
+    """A CPU-exported program must run on the benchmark device."""
+    program = torch.export.export(_ConstAttrModel().eval(), (torch.randn(2, 4),))
+    path = tmp_path / "model.pt2"
+    torch.export.save(program, str(path))
+
+    meta = torch.device("meta")
+    module = get_model(f"torchexport:{path}", device=meta, runtime_config=TorchRuntimeConfig())
+    out = module(torch.randn(2, 4, device=meta))
+    assert out.device == meta
+
+
 class _GradProbe(nn.Module):
     """Records whether autograd was active for each forward pass."""
 
@@ -166,7 +225,6 @@ def test_inference_runs_without_autograd():
     batch = torch.randn(4, 10)
 
     model = _GradProbe()
-    # parameters require grad, so without a no_grad guard every forward builds a graph
     assert all(p.requires_grad for p in model.parameters())
 
     _run_warmup(model, batch, device, num_warmup_batches=2, progress_bar=None)
