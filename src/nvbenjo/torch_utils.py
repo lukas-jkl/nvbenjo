@@ -17,7 +17,12 @@ import torch
 import torchvision
 from packaging.version import Version
 from torch import nn
-from torch.export.passes import move_to_device_pass
+
+try:
+    # move_to_device_pass is only available from PyTorch 2.5 on.
+    from torch.export.passes import move_to_device_pass
+except ImportError:
+    move_to_device_pass = None  # type: ignore[assignment]
 
 try:
     # PyTorch's aoti_load_package reaches for torch._inductor.codecache without
@@ -144,9 +149,12 @@ def _load_exported_module(path: str, device: torch.device) -> nn.Module:
     """Load a ``torch.export`` saved program and place it on ``device``.
 
     ``program.module().to(device)`` is not enough: it moves parameters and buffers but
-    leaves the lifted tensor constants behind. ``move_to_device_pass`` handles both.
+    leaves the lifted tensor constants behind. ``move_to_device_pass`` handles both, but it
+    only exists from PyTorch 2.5 on, so fall back to the partial move on older versions.
     """
     program = torch.export.load(path)
+    if move_to_device_pass is None:
+        return program.module().to(device)
     return move_to_device_pass(program, device).module()
 
 

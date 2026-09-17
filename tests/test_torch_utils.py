@@ -2,6 +2,7 @@ from contextlib import nullcontext
 
 import pytest
 import torch
+from packaging.version import Version
 from torch import nn
 
 from nvbenjo.cfg import TorchRuntimeConfig
@@ -155,6 +156,12 @@ class _ConstAttrModel(nn.Module):
         return self.fc(x) + self.offset
 
 
+requires_move_to_device_pass = pytest.mark.skipif(
+    Version(torch.__version__) < Version("2.5"), reason="move_to_device_pass requires PyTorch 2.5+"
+)
+
+
+@requires_move_to_device_pass
 def test_load_exported_module_puts_constants_on_device(tmp_path):
     program = torch.export.export(_ConstAttrModel().eval(), (torch.randn(2, 4),))
     path = tmp_path / "model.pt2"
@@ -168,14 +175,21 @@ def test_load_exported_module_puts_constants_on_device(tmp_path):
     assert devices == {meta}
 
 
+@pytest.mark.skipif(
+    Version(torch.__version__) < Version("2.8"), reason="aoti_load_package device_index requires PyTorch 2.8+"
+)
 def test_aoti_load_kwargs_pins_cuda_device_index():
     kwargs = _aoti_load_kwargs(torch.device("cuda:1"), run_single_threaded=True)
     assert kwargs == {"run_single_threaded": True, "device_index": 1}
+
+
+def test_aoti_load_kwargs_without_device_index():
     # No index and no CUDA -> nothing to pin, and ``None`` values are dropped.
     assert _aoti_load_kwargs(torch.device("cuda"), run_single_threaded=None) == {}
     assert _aoti_load_kwargs(torch.device("cpu"), run_single_threaded=True) == {"run_single_threaded": True}
 
 
+@requires_move_to_device_pass
 def test_load_exported_module_runs_on_other_device(tmp_path):
     """A CPU-exported program must run on the benchmark device (constants + baked asserts)."""
     program = torch.export.export(_ConstAttrModel().eval(), (torch.randn(2, 4),))
