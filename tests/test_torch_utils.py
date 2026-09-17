@@ -148,7 +148,7 @@ def test_run_model_with_input_dict_as_single_arg():
 
 
 class _ConstAttrModel(nn.Module):
-    """Model with a plain tensor attribute, which torch.export lifts into a constant."""
+    """Plain tensor attribute -> torch.export lifts it into a constant."""
 
     def __init__(self):
         super().__init__()
@@ -187,14 +187,13 @@ def test_aoti_load_kwargs_pins_cuda_device_index():
 
 
 def test_aoti_load_kwargs_without_device_index():
-    # No index and no CUDA -> nothing to pin, and ``None`` values are dropped.
     assert _aoti_load_kwargs(torch.device("cuda"), run_single_threaded=None) == {}
     assert _aoti_load_kwargs(torch.device("cpu"), run_single_threaded=True) == {"run_single_threaded": True}
 
 
 @requires_move_to_device_pass
 def test_load_exported_module_runs_on_other_device(tmp_path):
-    """A CPU-exported program must run on the benchmark device (constants + baked asserts)."""
+    """A CPU-exported program must run on the benchmark device."""
     program = torch.export.export(_ConstAttrModel().eval(), (torch.randn(2, 4),))
     path = tmp_path / "model.pt2"
     torch.export.save(program, str(path))
@@ -226,7 +225,6 @@ def test_inference_runs_without_autograd():
     batch = torch.randn(4, 10)
 
     model = _GradProbe()
-    # parameters require grad, so without a no_grad guard every forward builds a graph
     assert all(p.requires_grad for p in model.parameters())
 
     _run_warmup(model, batch, device, num_warmup_batches=2, progress_bar=None)

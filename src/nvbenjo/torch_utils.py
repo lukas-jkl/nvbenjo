@@ -32,9 +32,9 @@ except ImportError:
     pass
 from rich.progress import Progress
 
+import nvbenjo.torch_ops  # noqa: F401 - registers the custom ops
 from nvbenjo import console
 from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
-from nvbenjo.torch_ops import *
 from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task, sample_gpu_memory
 
 logger = logging.getLogger(__name__)
@@ -146,11 +146,10 @@ def get_model(
 
 
 def _load_exported_module(path: str, device: torch.device) -> nn.Module:
-    """Load a ``torch.export`` saved program and place it on ``device``.
+    """Load a ``torch.export`` program onto ``device``.
 
-    ``program.module().to(device)`` is not enough: it moves parameters and buffers but
-    leaves the lifted tensor constants behind. ``move_to_device_pass`` handles both, but it
-    only exists from PyTorch 2.5 on, so fall back to the partial move on older versions.
+    ``.to(device)`` moves parameters and buffers but leaves the lifted tensor constants
+    behind; ``move_to_device_pass`` moves both, but only exists from PyTorch 2.5 on.
     """
     program = torch.export.load(path)
     if move_to_device_pass is None:
