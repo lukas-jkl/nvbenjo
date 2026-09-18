@@ -474,7 +474,7 @@ def _aot_cache_path(
         key_parts["sm"] = torch.cuda.get_device_capability(device)
         key_parts["device_name"] = torch.cuda.get_device_name(device)
     digest = hashlib.sha256(json.dumps(key_parts, default=str, sort_keys=True).encode()).hexdigest()[:16]
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", model_cfg.name)
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", model_cfg.name or model_cfg.type_or_path)
     return Path(cache_dir).expanduser() / f"{safe_name}_{digest}.pt2"
 
 

@@ -27,7 +27,7 @@ class BaseModelConfig(ABC):
     Parameters
     ----------
     name : str
-        Name of the model.
+        Name of the model. Defaults to the model's key in ``nvbenjo.models``.
     type_or_path : str
         Model type or path. Can be a local file path or a model identifier.
     kwargs : dict
@@ -56,7 +56,7 @@ class BaseModelConfig(ABC):
                 real-time-factor: 3
     """
 
-    name: str = "resnet"
+    name: str = ""
     type_or_path: str = "torchvision:wide_resnet101_2"
     kwargs: dict = field(default_factory=dict)
     shape: tuple = ("B", 3, 224, 224)
@@ -214,7 +214,7 @@ class TorchModelConfig(BaseModelConfig):
     Parameters
     ----------
     name : str
-        Name of the model.
+        Name of the model. Defaults to the model's key in ``nvbenjo.models``.
     type_or_path : str
         Model type or path. Supports prefixes to specify the model source:
 
@@ -292,7 +292,7 @@ class OnnxModelConfig(BaseModelConfig):
     Parameters
     ----------
     name : str
-        Name of the model.
+        Name of the model. Defaults to the model's key in ``nvbenjo.models``.
     type_or_path : str
         Model type or path. Can be a local file path or a model identifier.
     kwargs : dict
@@ -342,6 +342,11 @@ def instantiate_model_configs(cfg: BenchConfig | DictConfig) -> dict[str, BaseMo
     runtimes = {}
     for model_name, model in cfg.nvbenjo.models.items():
         ctxt = open_dict(model) if isinstance(model, DictConfig) else nullcontext()
+        # A model is known by its config key unless the config sets an explicit name. This has to
+        # happen before instantiate() below, since __post_init__ already renders the name in messages.
+        if isinstance(model, DictConfig) and not model.get("name"):
+            with open_dict(model):
+                model["name"] = model_name
         if "_target_" not in model:
             with ctxt:
                 if model["type_or_path"].endswith(".onnx") or model["type_or_path"].startswith("onnx:"):
