@@ -8,7 +8,7 @@ from torch import nn
 
 from nvbenjo import torch_utils
 from nvbenjo.benchmark import _run_warmup
-from nvbenjo.cfg import TorchRuntimeConfig
+from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
 from nvbenjo.torch_utils import (
     _aoti_load_kwargs,
     apply_batch_precision,
@@ -305,3 +305,19 @@ def test_cuda_graphed_model_replays_under_device_ctxt(monkeypatch):
     assert result == "captured-output"
     # the input was copied into the captured buffer inside the context, before the replay
     assert torch.equal(static_input, torch.ones(2, 3))
+
+
+def test_aot_cache_path_distinguishes_matmul_precision(tmp_path):
+    model_cfg = TorchModelConfig(name="m", type_or_path="torchvision:resnet18")
+    paths = {
+        precision: torch_utils._aot_cache_path(
+            cache_dir=str(tmp_path),
+            model_cfg=model_cfg,
+            batch_size=1,
+            runtime_cfg=TorchRuntimeConfig(matmul_precision=precision),
+            device=torch.device("cpu"),
+        )
+        for precision in (None, "highest", "high", "medium")
+    }
+
+    assert len(set(paths.values())) == len(paths), paths

@@ -382,15 +382,16 @@ def benchmark_model(
                     elif runtime_cfg._compile_mode == utils.CompileMode.AOT_COMPILE:
                         if torch_utils.AMP_PREFIX in runtime_cfg.precision.value:
                             raise ValueError("Can't run exported model with AMP precision")
-                        model = torch_utils._aot_compile_or_load(
-                            model=model,
-                            batch=batch,
-                            device=device,
-                            model_cfg=model_cfg,
-                            batch_size=batch_size,
-                            runtime_cfg=runtime_cfg,
-                            progress_bar=progress_bar,
-                        )
+                        with torch_utils.matmul_precision_ctxt(runtime_cfg.matmul_precision):
+                            model = torch_utils._aot_compile_or_load(
+                                model=model,
+                                batch=batch,
+                                device=device,
+                                model_cfg=model_cfg,
+                                batch_size=batch_size,
+                                runtime_cfg=runtime_cfg,
+                                progress_bar=progress_bar,
+                            )
                     else:
                         raise ValueError(f"Unknown compile mode {runtime_cfg._compile_mode}")
 

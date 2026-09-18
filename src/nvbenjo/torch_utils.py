@@ -480,6 +480,7 @@ def _aot_cache_path(
         "shape": list(model_cfg.shape),
         "batch_size": batch_size,
         "precision": runtime_cfg.precision.value,
+        "matmul_precision": runtime_cfg.matmul_precision,
         "compile_kwargs": sorted((k, v) for k, v in runtime_cfg.compile_kwargs.items() if k != "package_path"),
         "device_type": device.type,
     }
