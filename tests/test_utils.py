@@ -186,13 +186,16 @@ def test_check_shape_dict_errors(shape_dict, match):
         _check_shape_dict(shape_dict)
 
 
-def test_get_rnd_shape_int_with_scalar_value():
+@pytest.mark.parametrize("dtype", ["int", "float"])
+@pytest.mark.parametrize("value", [5, 0])
+def test_get_rnd_shape_with_scalar_value(dtype, value):
     rnd, _ = get_rnd_from_shape_s(
-        ({"name": "a", "type": "int", "shape": ("B", 3), "value": 5},),
+        ({"name": "a", "type": dtype, "shape": ("B", 3), "value": value},),
         batch_size=2,
     )
     assert rnd["a"].shape == (2, 3)
-    assert (rnd["a"] == 5).all()
+    # 0 is a requested constant, not an unset value to be filled with random data
+    assert (rnd["a"] == value).all()
 
 
 def test_get_rnd_shape_int_with_list_value():

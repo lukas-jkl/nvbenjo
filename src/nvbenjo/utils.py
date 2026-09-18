@@ -90,7 +90,7 @@ def _get_rnd(
 ) -> torch.Tensor:
     if dtype is None or any(s in dtype for s in ["float", "double"]):
         dtype = dtype if dtype is not None else "float32"
-        if value:
+        if value is not None:
             if isinstance(value, (ListConfig, list)):
                 rnd = torch.tensor(value, dtype=getattr(torch, dtype)).expand(shape_tuple)
             else:
@@ -98,7 +98,7 @@ def _get_rnd(
         else:
             rnd = torch.distributions.Uniform(min_val, max_val).sample(shape_tuple).to(dtype=getattr(torch, dtype))
     elif any(s in dtype for s in ["int", "long"]):
-        if value:
+        if value is not None:
             if isinstance(value, (ListConfig, list)):
                 rnd = torch.tensor(value, dtype=getattr(torch, dtype)).expand(shape_tuple)
             else:
