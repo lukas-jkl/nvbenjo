@@ -15,7 +15,8 @@ import yaml
 from hydra import compose, initialize
 from packaging.version import Version
 
-from nvbenjo.cli import run
+from nvbenjo import cfg
+from nvbenjo.cli import _collect_custom_metric_keys, run
 
 DATA_FILE = "out.csv"
 EXPECTED_OUTPUT_FILES = [
@@ -504,3 +505,13 @@ def test_cli_help():
     )
     assert "== Nvbenjo ==" in result.stdout, f"Help header missing, got: {result.stdout}"
     assert "For more examples, see: nvbenjo/conf/" in result.stdout, f"Help footer missing, got: {result.stdout}"
+
+
+def test_collect_custom_metric_keys_keeps_config_order():
+    models = {
+        "a": cfg.TorchModelConfig(custom_batchmetrics={"fps": 1.0, "rtf": 3.0}),
+        "b": cfg.TorchModelConfig(custom_batchmetrics={"rtf": 3.0, "latency_score": 2.0}),
+    }
+    # config order, de-duplicated; a set here would vary the order between runs and with it the
+    # metric shown in the summary table
+    assert _collect_custom_metric_keys(models) == ["fps", "rtf", "latency_score"]

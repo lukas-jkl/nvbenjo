@@ -1,6 +1,4 @@
-import functools
 import logging
-import operator
 import os
 import sys
 from importlib.metadata import version
@@ -51,9 +49,7 @@ def run(cfg: BenchConfig | DictConfig) -> None:
         with open(join(output_dir, "config.yaml"), "w") as f:
             f.write(OmegaConf.to_yaml(cfg))
 
-    custom_metric_keys = list(
-        set(functools.reduce(operator.iadd, [list(mcfg.custom_batchmetrics.keys()) for mcfg in models.values()], []))
-    )
+    custom_metric_keys = _collect_custom_metric_keys(models)
     if output_dir is not None:
         logger.info("Generating plots...")
         plot.visualize_results(
@@ -72,6 +68,14 @@ def run(cfg: BenchConfig | DictConfig) -> None:
     plot.print_system_info(system_info)
     plot.print_results(results, custom_metric_keys=custom_metric_keys)
     logger.info(f"Benchmark finished, outputs in: {output_dir}")
+x
+
+def _collect_custom_metric_keys(models: dict) -> list[str]:
+    """Custom batch metric keys of all models, de-duplicated and in config order.
+
+    Order matters: the first key picks the metric for the summary table
+    """
+    return list(dict.fromkeys(key for mcfg in models.values() for key in mcfg.custom_batchmetrics))
 
 
 def _fix_config_path():
