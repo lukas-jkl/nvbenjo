@@ -179,10 +179,11 @@ def _measure_timings(
     progress_bar: Progress | None,
     timing_function: Callable = torch_utils.measure_repeated_inference_timing,
     profiler: torch.profiler.profile | None = None,
+    task_description: str = "    Inference",
 ) -> pd.DataFrame:
     if progress_bar is not None:
         measure_task = progress_bar.add_task(
-            "    Inference",
+            task_description,
             total=num_batches,
         )
 
@@ -457,6 +458,20 @@ def benchmark_model(
 
                 num_model_parameters = 0
                 set_dtype = False
+
+                if model_cfg.num_warmup_batches > 0:
+                    # warm up through the same code path we time, so ort lazy init and autotuning are excluded
+                    _measure_timings(
+                        model,
+                        batch,
+                        batch_size,
+                        device,
+                        model_cfg.num_warmup_batches,
+                        progress_bar,
+                        timing_function=onnx_utils.measure_repeated_inference_timing,
+                        task_description="    Warm-up",
+                    )
+
                 torch_memory_alloc = None  # no memory allocation can be measured for onnx
                 if measure_memory:
                     gpu_memory_alloc = onnx_utils.measure_gpu_memory_allocation(model, batch, device)
