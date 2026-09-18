@@ -24,7 +24,7 @@ def test_python(session, torch):
 
 @nox.session(name="test-torch", venv_backend="uv")
 @nox.parametrize("python", ["3.12"])
-@nox.parametrize("torch", ["2.4", "2.6", "2.10.0"])
+@nox.parametrize("torch", ["2.4", "2.6", "2.10.0", "2.14.0"])
 def test_torch(session, torch):
     session.install(f"torch=={torch}")
     session.install("-e", ".[onnx-cpu]", "--group", "dev")
