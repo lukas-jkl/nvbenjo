@@ -165,6 +165,8 @@ class TorchRuntimeConfig:
             is_true = self.compile is True or str(self.compile).lower() == "true"
             self.compile = "torch_compile" if is_true else "none"
         self._compile_mode = CompileMode(self.compile.lower())
+        if not isinstance(self.precision, PrecisionType):
+            self.precision = PrecisionType[str(self.precision).upper()]
 
 
 @dataclass
@@ -370,9 +372,6 @@ def instantiate_model_configs(cfg: BenchConfig | DictConfig) -> dict[str, BaseMo
                             runtimes[model_name][runtime_name] = instantiate(
                                 cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]
                             )
-                            runtimes[model_name][runtime_name].precision = PrecisionType[
-                                cfg.nvbenjo.models[model_name]["runtime_options"][runtime_name]["precision"].upper()
-                            ]
 
         models[model_name] = instantiate(model) if isinstance(model, DictConfig) else model
         if model_name in runtimes:
