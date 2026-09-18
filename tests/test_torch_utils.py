@@ -1,10 +1,12 @@
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 from packaging.version import Version
 from torch import nn
 
+from nvbenjo import torch_utils
 from nvbenjo.benchmark import _run_warmup
 from nvbenjo.cfg import TorchRuntimeConfig
 from nvbenjo.torch_utils import (
@@ -267,3 +269,39 @@ def test_get_model_returns_eval_mode_saved_models(tmp_path):
     jit_path = tmp_path / "model.jit"
     torch.jit.save(torch.jit.script(_BatchNormModel().train()), jit_path)
     assert not get_model(str(jit_path), device=device, runtime_config=runtime_config).training
+
+
+@contextmanager
+def _recording_device_ctxt(device, entered):
+    entered.append(device)
+    yield
+
+
+def test_timing_loop_runs_under_device_ctxt(monkeypatch):
+    entered: list[torch.device] = []
+    monkeypatch.setattr(torch_utils, "device_ctxt", lambda device: _recording_device_ctxt(device, entered))
+
+    model = nn.Linear(4, 2).eval()
+    measure_repeated_inference_timing(
+        model, torch.randn(2, 4), batch_size=2, model_device=torch.device("cpu"), num_runs=2
+    )
+
+    assert entered == [torch.device("cpu")]
+
+
+def test_cuda_graphed_model_replays_under_device_ctxt(monkeypatch):
+    # replay() takes no stream or device argument, so the captured device has to be made current
+    entered: list[torch.device] = []
+    monkeypatch.setattr(torch_utils, "device_ctxt", lambda device: _recording_device_ctxt(device, entered))
+
+    graph = MagicMock()
+    static_input = torch.zeros(2, 3)
+    graphed = torch_utils._CudaGraphedModel(graph, static_input, "captured-output", torch.device("cuda:1"))
+
+    result = graphed(torch.ones(2, 3))
+
+    assert entered == [torch.device("cuda:1")]
+    graph.replay.assert_called_once()
+    assert result == "captured-output"
+    # the input was copied into the captured buffer inside the context, before the replay
+    assert torch.equal(static_input, torch.ones(2, 3))

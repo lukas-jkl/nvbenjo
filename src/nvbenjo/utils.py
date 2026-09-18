@@ -4,7 +4,7 @@ import os
 import threading
 import time
 import typing as ty
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from enum import Enum
 
 import pandas as pd
@@ -208,6 +208,18 @@ def calculate_batchmetrics(results: pd.DataFrame, custom_batchmetrics: dict[str,
     return results
 
 
+def device_ctxt(device: torch.device) -> AbstractContextManager:
+    """Make ``device`` the current CUDA device for the duration of the block.
+
+    Torch CUDA calls that take an optional ``device`` — recording an event, ``synchronize``,
+    ``current_stream``, CUDA graph capture — fall back to ``torch.cuda.current_device()``
+    A no-op for non-CUDA devices.
+    """
+    if device.type != "cuda":
+        return nullcontext()
+    return torch.cuda.device(device)
+
+
 @contextmanager
 def progress_task(progress: Progress | None, task_name: str, **kwargs):
     if progress is None:
@@ -233,7 +245,9 @@ def sample_gpu_memory(
         return
 
     pynvml.nvmlInit()
-    handle = pynvml.nvmlDeviceGetHandleByIndex(device.index if device.index is not None else 0)
+    # a bare "cuda" carries no index -> resolve current one if needed
+    device_index = device.index if device.index is not None else torch.cuda.current_device()
+    handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
     pid = os.getpid()
 
     while not stop_event.is_set():

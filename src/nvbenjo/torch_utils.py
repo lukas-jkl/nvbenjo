@@ -29,7 +29,15 @@ from rich.progress import Progress
 import nvbenjo.torch_ops  # noqa: F401 - registers the custom ops
 from nvbenjo import console
 from nvbenjo.cfg import TorchModelConfig, TorchRuntimeConfig
-from nvbenjo.utils import AMP_PREFIX, TRANSFER_WARNING, PrecisionType, TensorLike, progress_task, sample_gpu_memory
+from nvbenjo.utils import (
+    AMP_PREFIX,
+    TRANSFER_WARNING,
+    PrecisionType,
+    TensorLike,
+    device_ctxt,
+    progress_task,
+    sample_gpu_memory,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -394,47 +402,49 @@ def measure_repeated_inference_timing(
     """
     results_raw = []
 
-    for _ in range(num_runs):
-        start_on_cpu = time.perf_counter()
-        device_sample = transfer_to_device_fn(sample, model_device)
+    # events, current_stream and synchronize() all resolve against the current device
+    with device_ctxt(model_device):
+        for _ in range(num_runs):
+            start_on_cpu = time.perf_counter()
+            device_sample = transfer_to_device_fn(sample, model_device)
 
-        if model_device.type == "cuda":
-            start_event = torch.cuda.Event(enable_timing=True)
-            stop_event = torch.cuda.Event(enable_timing=True)
-            start_event.record()  # For GPU timing
-        start_on_device = time.perf_counter()  # For CPU timing
+            if model_device.type == "cuda":
+                start_event = torch.cuda.Event(enable_timing=True)
+                stop_event = torch.cuda.Event(enable_timing=True)
+                start_event.record()  # For GPU timing
+            start_on_device = time.perf_counter()  # For CPU timing
 
-        device_result = run_model_with_input(model, device_sample)
+            device_result = run_model_with_input(model, device_sample)
 
-        if model_device.type == "cuda":
-            stop_event.record()
-            torch.cuda.synchronize()
-            # elapsed_on_device = stop_event.elapsed_time(start_event)
-            elapsed_on_device = start_event.elapsed_time(stop_event) / 1000.0
-            stop_on_device = time.perf_counter()
-        else:
-            stop_on_device = time.perf_counter()
-            elapsed_on_device = stop_on_device - start_on_device
+            if model_device.type == "cuda":
+                stop_event.record()
+                torch.cuda.synchronize()
+                # elapsed_on_device = stop_event.elapsed_time(start_event)
+                elapsed_on_device = start_event.elapsed_time(stop_event) / 1000.0
+                stop_on_device = time.perf_counter()
+            else:
+                stop_on_device = time.perf_counter()
+                elapsed_on_device = stop_on_device - start_on_device
 
-        try:
-            transfer_to_device_fn(device_result, torch.device("cpu"))
-        except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
-            console.print(TRANSFER_WARNING)
-        stop_on_cpu = time.perf_counter()
+            try:
+                transfer_to_device_fn(device_result, torch.device("cpu"))
+            except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
+                console.print(TRANSFER_WARNING)
+            stop_on_cpu = time.perf_counter()
 
-        assert elapsed_on_device > 0
+            assert elapsed_on_device > 0
 
-        results_raw.append(
-            {
-                "time_cpu_to_device": start_on_device - start_on_cpu,
-                "time_inference": elapsed_on_device,
-                "time_device_to_cpu": stop_on_cpu - stop_on_device,
-                "time_total": stop_on_cpu - start_on_cpu,
-                "time_total_batch_normalized": (stop_on_cpu - start_on_cpu) / batch_size,
-            }
-        )
-        if progress_callback is not None:
-            progress_callback()
+            results_raw.append(
+                {
+                    "time_cpu_to_device": start_on_device - start_on_cpu,
+                    "time_inference": elapsed_on_device,
+                    "time_device_to_cpu": stop_on_cpu - stop_on_device,
+                    "time_total": stop_on_cpu - start_on_cpu,
+                    "time_total_batch_normalized": (stop_on_cpu - start_on_cpu) / batch_size,
+                }
+            )
+            if progress_callback is not None:
+                progress_callback()
 
     results_raw = pd.DataFrame(results_raw)
 
@@ -596,8 +606,10 @@ class _CudaGraphedModel:
             self._pick_src = lambda args, kwargs: args[0]
 
     def __call__(self, *args, **kwargs) -> ty.Any:
-        _copy_into(self.static_input, self._pick_src(args, kwargs))
-        self.graph.replay()
+        # replay() goes to the current device's stream, which need not be the captured one
+        with device_ctxt(self.device):
+            _copy_into(self.static_input, self._pick_src(args, kwargs))
+            self.graph.replay()
         return self.static_output
 
     def transfer_to_device(self, x: ty.Any, to_device: torch.device) -> ty.Any:
@@ -633,19 +645,21 @@ def _cuda_graph_capture(
 
     static_input = transfer_to_device(batch, device)
 
-    with progress_task(progress_bar, "    CUDA graph warm-up", total=num_warmup_iters) as task:
-        s = torch.cuda.Stream(device=device)
-        s.wait_stream(torch.cuda.current_stream(device))
-        with torch.cuda.stream(s):
-            for _ in range(num_warmup_iters):
-                static_output = run_model_with_input(model, static_input)
-                if progress_bar is not None and task is not None:
-                    progress_bar.advance(task)
-        torch.cuda.current_stream(device).wait_stream(s)
+    # torch.cuda.graph() captures on the current device's stream so make the device current
+    with device_ctxt(device):
+        with progress_task(progress_bar, "    CUDA graph warm-up", total=num_warmup_iters) as task:
+            s = torch.cuda.Stream(device=device)
+            s.wait_stream(torch.cuda.current_stream(device))
+            with torch.cuda.stream(s):
+                for _ in range(num_warmup_iters):
+                    static_output = run_model_with_input(model, static_input)
+                    if progress_bar is not None and task is not None:
+                        progress_bar.advance(task)
+            torch.cuda.current_stream(device).wait_stream(s)
 
-    with progress_task(progress_bar, "    CUDA graph capture", total=None):
-        graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(graph, **(capture_kwargs or {})):
-            static_output = run_model_with_input(model, static_input)
+        with progress_task(progress_bar, "    CUDA graph capture", total=None):
+            graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(graph, **(capture_kwargs or {})):
+                static_output = run_model_with_input(model, static_input)
 
     return _CudaGraphedModel(graph, static_input, static_output, device, model=model)
