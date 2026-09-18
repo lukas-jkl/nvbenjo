@@ -128,7 +128,6 @@ def visualize_results(
                     palette="dark",
                     alpha=0.6,
                 )
-                device_stem = f"{device}_" if mult_devices else ""
                 os.makedirs(join(output_dir, "summary"), exist_ok=True)
                 plt.savefig(join(output_dir, "summary", f"summary_{key}.png"))
                 plt.close()
