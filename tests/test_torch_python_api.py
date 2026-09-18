@@ -45,7 +45,8 @@ def test_pytorch_simple():
         )
         results = benchmark.benchmark_models({"model_1": model_cfg})
         assert not results.empty
-        assert "model_1" in results.model.to_numpy()
+        # an explicit name wins over the key the config was passed under
+        assert "torch-shufflenet-v2-x0-5" in results.model.to_numpy()
         assert "test1" in results.runtime_options.to_numpy()
         assert len(results.time_inference.to_numpy()) == num_batches
 

@@ -17,7 +17,6 @@ footer: |
     measure_memory: true
     models:
       resnet50:
-        name: resnet50
         type_or_path: torchvision:resnet50
         shape: [B, 3, 224, 224]
         batch_sizes: [16, 32]

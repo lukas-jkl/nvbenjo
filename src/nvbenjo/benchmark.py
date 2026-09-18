@@ -112,7 +112,9 @@ def benchmark_models(model_cfgs: dict[str, BaseModelConfig], measure_memory: boo
         model_task = progress_bar.add_task("Benchmarking models", total=len(model_cfgs))
         results = []
 
-        for model_name, model_cfg in model_cfgs.items():
+        for key, model_cfg in model_cfgs.items():
+            # a config is known by the key it was passed under unless it carries an explicit name
+            model_name = model_cfg.name or key
             progress_bar.update(model_task, description=f"Benchmarking {model_name}")
             model_results = benchmark_model(model_cfg, progress_bar=progress_bar, measure_memory=measure_memory)
             model_results["model"] = model_name
@@ -476,7 +478,9 @@ def benchmark_model(
 
             cur_results["torch_memory_bytes"] = torch_memory_alloc
             cur_results["gpu_memory_bytes"] = gpu_memory_alloc
-            cur_results["model"] = model_cfg.name
+            # benchmark_models() overwrites this with the model's config key, a standalone
+            # benchmark_model() call may get a config that was never named
+            cur_results["model"] = model_cfg.name or model_cfg.type_or_path
             cur_results["batch_size"] = batch_size
             cur_results["runtime_options"] = runtime_option_name
             cur_results["device"] = str(device)
