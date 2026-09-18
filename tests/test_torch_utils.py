@@ -245,11 +245,15 @@ class _BatchNormModel(nn.Module):
         return self.bn(x)
 
 
-def test_get_model_returns_eval_mode_torchvision():
+def test_get_model_torchvision():
     model = get_model(
         "torchvision:resnet18", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig(), weights=None
     )
     assert not model.training
+
+    # an unknown name must fail here, not return None and blow up later at call time
+    with pytest.raises(ValueError, match="Invalid torchvision model reznet18"):
+        get_model("torchvision:reznet18", device=torch.device("cpu"), runtime_config=TorchRuntimeConfig(), weights=None)
 
 
 def test_get_model_returns_eval_mode_saved_models(tmp_path):

@@ -120,12 +120,15 @@ def get_model(
     elif type_or_path.startswith("torchvision:"):
         type_or_path = type_or_path[len("torchvision:") :]
         available_torchvision_models = torchvision.models.list_models()
-        if type_or_path in available_torchvision_models:
-            if verbose and console is not None:
-                console.print(f"Loading torchvision model {type_or_path}")
-            model = torchvision.models.get_model(type_or_path, **kwargs).to(device)
-            model.eval()
-            return model
+        if type_or_path not in available_torchvision_models:
+            raise ValueError(
+                f"Invalid torchvision model {type_or_path}. Must be one of {available_torchvision_models}\n"
+            )
+        if verbose and console is not None:
+            console.print(f"Loading torchvision model {type_or_path}")
+        model = torchvision.models.get_model(type_or_path, **kwargs).to(device)
+        model.eval()
+        return model
     else:
         available_torchvision_models = torchvision.models.list_models()
         raise ValueError(
