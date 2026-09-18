@@ -154,3 +154,36 @@ def test_aot_cuda_graph(tmp_path):
     assert not results.empty
     assert "aot_graphed" in results.runtime_options.to_numpy()
     assert len(results[results.runtime_options == "aot_graphed"]) == num_batches
+
+
+class _CountingModel(nn.Module):
+    """Tiny model counting how often it was run."""
+
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Linear(16, 8)
+        self.num_inferences = 0
+
+    def forward(self, x):
+        self.num_inferences += 1
+        return self.fc(x)
+
+
+def test_warmup_runs_model(monkeypatch):
+    num_warmup_batches, num_batches = 3, 2
+    model = _CountingModel()
+    monkeypatch.setattr(benchmark, "load_model", lambda *args, **kwargs: model)
+
+    model_cfg = cfg.TorchModelConfig(
+        name="counting-torch",
+        type_or_path="counting",
+        shape=(("B", 16),),
+        devices=["cpu"],
+        batch_sizes=[1],
+        num_warmup_batches=num_warmup_batches,
+        num_batches=num_batches,
+        runtime_options={"default": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32)},
+    )
+    benchmark.benchmark_model(model_cfg, measure_memory=False)
+
+    assert model.num_inferences == num_warmup_batches + num_batches
