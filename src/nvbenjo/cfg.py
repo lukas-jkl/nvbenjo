@@ -263,7 +263,6 @@ class TorchModelConfig(BaseModelConfig):
         Dictionary mapping runtime names to their specific runtime configurations.
     """
 
-    model_kwargs: dict = field(default_factory=dict)
     runtime_options: dict[str, TorchRuntimeConfig] = field(default_factory=lambda: {"default": TorchRuntimeConfig()})
 
     def __post_init__(self):
