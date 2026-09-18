@@ -447,6 +447,7 @@ def benchmark_model(
                             timing_function=functools.partial(
                                 torch_utils.measure_repeated_inference_timing, transfer_to_device_fn=transfer_fn
                             ),
+                            profiler=profiler,
                         )
                     if profiler is not None:
                         time_str = time.strftime("%Y-%m-%d_%H-%M-%S")

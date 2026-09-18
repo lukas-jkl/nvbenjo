@@ -1,3 +1,4 @@
+import json
 import os
 from tempfile import TemporaryDirectory
 
@@ -21,7 +22,10 @@ class _Tiny(nn.Module):
 
 def test_pytorch_simple():
     with TemporaryDirectory() as tmpdir:
-        num_batches = 2
+        # a scheduled profiler only records if it is stepped once per timed batch; wait + warmup +
+        # active == num_batches so the cycle completes exactly at the last batch
+        num_batches = 4
+        profiler_schedule = torch.profiler.schedule(wait=1, warmup=1, active=2, repeat=1)
         model_cfg = cfg.TorchModelConfig(
             name="torch-shufflenet-v2-x0-5",
             type_or_path="torchvision:shufflenet_v2_x0_5",
@@ -36,7 +40,11 @@ def test_pytorch_simple():
                     precision=PrecisionType.FP32,
                     enable_profiling=True,
                     profiling_prefix=os.path.join(tmpdir, "profile_"),
-                    profiler_kwargs={"profile_memory": True, "record_shapes": True},
+                    profiler_kwargs={
+                        "profile_memory": True,
+                        "record_shapes": True,
+                        "schedule": profiler_schedule,
+                    },
                 ),
             },
             custom_batchmetrics={
@@ -55,6 +63,11 @@ def test_pytorch_simple():
         assert len(profile_files) == 1
         assert profile_files[0].startswith("profile_")
         assert profile_files[0].endswith(".json")
+
+        # a trace with events means the profiler was stepped through its schedule
+        with open(os.path.join(tmpdir, profile_files[0])) as f:
+            trace = json.load(f)
+        assert trace.get("traceEvents"), "Exported chrome trace contains no events"
 
 
 @pytest.mark.skipif(
