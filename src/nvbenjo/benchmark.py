@@ -527,4 +527,12 @@ def benchmark_model(
     if progress_bar is not None:
         progress_bar.remove_task(bench_task)
 
+    if not results:
+        # every combination was skipped or OOMed; pd.concat([]) would raise the far less
+        # helpful "No objects to concatenate"
+        raise RuntimeError(
+            f"No benchmark results for {model_cfg.name or model_cfg.type_or_path}: every "
+            "device/batch-size/runtime combination was skipped or ran out of memory."
+        )
+
     return pd.concat(results)

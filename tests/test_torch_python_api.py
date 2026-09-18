@@ -200,3 +200,20 @@ def test_warmup_runs_model(monkeypatch):
     benchmark.benchmark_model(model_cfg, measure_memory=False)
 
     assert model.num_inferences == num_warmup_batches + num_batches
+
+
+def test_benchmark_model_without_any_results():
+    # nothing to run stands in for "every combination OOMed"; both leave results empty and used
+    # to surface as pandas' "No objects to concatenate"
+    model_cfg = cfg.TorchModelConfig(
+        name="nothing-to-run",
+        type_or_path="torchvision:shufflenet_v2_x0_5",
+        shape=(("B", 3, 224, 224),),
+        devices=["cpu"],
+        batch_sizes=[],
+        num_warmup_batches=1,
+        num_batches=1,
+        runtime_options={"default": cfg.TorchRuntimeConfig(compile=False, precision=PrecisionType.FP32)},
+    )
+    with pytest.raises(RuntimeError, match="No benchmark results for nothing-to-run"):
+        benchmark.benchmark_model(model_cfg, measure_memory=False)
