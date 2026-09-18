@@ -17,7 +17,14 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from . import console
 from .torch_utils import transfer_to_device
-from .utils import EXAMPLE_VALID_SHAPES, TRANSFER_WARNING, Shape, _check_shape_dict, get_rnd_from_shape_s
+from .utils import (
+    EXAMPLE_VALID_SHAPES,
+    TRANSFER_WARNING,
+    Shape,
+    _check_shape_dict,
+    device_ctxt,
+    get_rnd_from_shape_s,
+)
 
 
 def get_model(
@@ -252,81 +259,89 @@ def measure_repeated_inference_timing(
     }
     del outputs
 
-    for _ in range(num_runs):
-        start_on_cpu = time.perf_counter()
-        device_sample = transfer_to_device_fn(sample, model_device)
+    # events, current_stream and synchronize() all resolve against the current device
+    with device_ctxt(model_device):
+        for _ in range(num_runs):
+            start_on_cpu = time.perf_counter()
+            device_sample = transfer_to_device_fn(sample, model_device)
 
-        if model_device.type == "cuda":
-            start_event = torch.cuda.Event(enable_timing=True)
-            stop_event = torch.cuda.Event(enable_timing=True)
-            start_event.record()  # For GPU timing
-        start_on_device = time.perf_counter()  # For CPU timing
+            if model_device.type == "cuda":
+                start_event = torch.cuda.Event(enable_timing=True)
+                stop_event = torch.cuda.Event(enable_timing=True)
+                start_event.record()  # For GPU timing
+            start_on_device = time.perf_counter()  # For CPU timing
 
-        io_binding = model.io_binding()
-        device_id = 0 if model_device.index is None else model_device.index
+            io_binding = model.io_binding()
+            # a bare "cuda" carries no index and means the current device, which need not be 0
+            if model_device.index is not None:
+                device_id = model_device.index
+            elif model_device.type == "cuda":
+                device_id = torch.cuda.current_device()
+            else:
+                device_id = 0
 
-        if isinstance(device_sample, dict):
-            for i, (name, input) in enumerate(device_sample.items()):
-                assert isinstance(input, torch.Tensor)
-                io_binding.bind_input(
-                    name=name,
+            if isinstance(device_sample, dict):
+                for i, (name, input) in enumerate(device_sample.items()):
+                    assert isinstance(input, torch.Tensor)
+                    io_binding.bind_input(
+                        name=name,
+                        device_type=model_device.type,
+                        device_id=device_id,
+                        element_type=str(input.dtype).removeprefix("torch."),
+                        shape=input.shape,
+                        buffer_ptr=input.data_ptr(),
+                    )
+            else:
+                raise TypeError(f"Invalid input type {type(device_sample)}. Must be one of list, tuple, dict")
+
+            device_result = []
+            for i, output in enumerate(onnx_model_outputs):
+                torch_dtype = dtype_map.get(output.type, torch.float32)  # default to float32 if type not found
+                output_tensor = torch.empty(size=output_shapes[output.name], dtype=torch_dtype, device=model_device)
+                io_binding.bind_output(
+                    name=output.name,
                     device_type=model_device.type,
                     device_id=device_id,
-                    element_type=str(input.dtype).removeprefix("torch."),
-                    shape=input.shape,
-                    buffer_ptr=input.data_ptr(),
+                    element_type=str(output_tensor.dtype).removeprefix("torch."),
+                    shape=output_tensor.shape,
+                    buffer_ptr=output_tensor.data_ptr(),
                 )
-        else:
-            raise TypeError(f"Invalid input type {type(device_sample)}. Must be one of list, tuple, dict")
+                device_result.append(output_tensor)
 
-        device_result = []
-        for i, output in enumerate(onnx_model_outputs):
-            torch_dtype = dtype_map.get(output.type, torch.float32)  # default to float32 if type not found
-            output_tensor = torch.empty(size=output_shapes[output.name], dtype=torch_dtype, device=model_device)
-            io_binding.bind_output(
-                name=output.name,
-                device_type=model_device.type,
-                device_id=device_id,
-                element_type=str(output_tensor.dtype).removeprefix("torch."),
-                shape=output_tensor.shape,
-                buffer_ptr=output_tensor.data_ptr(),
+            model.run_with_iobinding(io_binding)
+
+            if model_device.type == "cuda":
+                stop_event.record()
+                torch.cuda.synchronize()
+                elapsed_on_device = start_event.elapsed_time(stop_event) / 1000.0
+                stop_on_device = time.perf_counter()
+            else:
+                stop_on_device = time.perf_counter()
+                elapsed_on_device = stop_on_device - start_on_device
+
+            try:
+                transfer_to_device_fn(device_result, torch.device("cpu"))
+            except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
+                console.print(TRANSFER_WARNING)
+            stop_on_cpu = time.perf_counter()
+
+            assert elapsed_on_device > 0
+
+            time_cpu_to_device.append(start_on_device - start_on_cpu)
+            time_inference.append(elapsed_on_device)
+            time_device_to_cpu.append(stop_on_cpu - stop_on_device)
+            time_total.append(stop_on_cpu - start_on_cpu)
+            results_raw.append(
+                {
+                    "time_cpu_to_device": start_on_device - start_on_cpu,
+                    "time_inference": elapsed_on_device,
+                    "time_device_to_cpu": stop_on_cpu - stop_on_device,
+                    "time_total": stop_on_cpu - start_on_cpu,
+                    "time_total_batch_normalized": (stop_on_cpu - start_on_cpu) / batch_size,
+                }
             )
-            device_result.append(output_tensor)
-
-        model.run_with_iobinding(io_binding)
-
-        if model_device.type == "cuda":
-            stop_event.record()
-            torch.cuda.synchronize()
-            elapsed_on_device = start_event.elapsed_time(stop_event) / 1000.0
-            stop_on_device = time.perf_counter()
-        else:
-            stop_on_device = time.perf_counter()
-            elapsed_on_device = stop_on_device - start_on_device
-
-        try:
-            transfer_to_device_fn(device_result, torch.device("cpu"))
-        except Exception:  # noqa: BLE001 - device transfer may fail in many ways; warn and continue
-            console.print(TRANSFER_WARNING)
-        stop_on_cpu = time.perf_counter()
-
-        assert elapsed_on_device > 0
-
-        time_cpu_to_device.append(start_on_device - start_on_cpu)
-        time_inference.append(elapsed_on_device)
-        time_device_to_cpu.append(stop_on_cpu - stop_on_device)
-        time_total.append(stop_on_cpu - start_on_cpu)
-        results_raw.append(
-            {
-                "time_cpu_to_device": start_on_device - start_on_cpu,
-                "time_inference": elapsed_on_device,
-                "time_device_to_cpu": stop_on_cpu - stop_on_device,
-                "time_total": stop_on_cpu - start_on_cpu,
-                "time_total_batch_normalized": (stop_on_cpu - start_on_cpu) / batch_size,
-            }
-        )
-        if progress_callback is not None:
-            progress_callback()
+            if progress_callback is not None:
+                progress_callback()
 
     results_raw = pd.DataFrame(results_raw)
 
