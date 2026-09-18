@@ -2,6 +2,7 @@ import csv
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import warnings
 from copy import copy
@@ -16,7 +17,7 @@ from hydra import compose, initialize
 from packaging.version import Version
 
 from nvbenjo import cfg
-from nvbenjo.cli import _collect_custom_metric_keys, run
+from nvbenjo.cli import _collect_custom_metric_keys, _fix_config_path, run
 
 DATA_FILE = "out.csv"
 EXPECTED_OUTPUT_FILES = [
@@ -515,3 +516,32 @@ def test_collect_custom_metric_keys_keeps_config_order():
     # config order, de-duplicated; a set here would vary the order between runs and with it the
     # metric shown in the summary table
     assert _collect_custom_metric_keys(models) == ["fps", "rtf", "latency_score"]
+
+
+@pytest.mark.parametrize(
+    "argv,expected",
+    [
+        # a directory in -cn is split off into a generated -cd
+        (["nvbenjo", "-cn", "/some/dir/my.yaml"], ["nvbenjo", "-cn", "my.yaml", "-cd", "/some/dir"]),
+        (
+            ["nvbenjo", "--config-name", "/some/dir/my.yaml"],
+            ["nvbenjo", "--config-name", "my.yaml", "-cd", "/some/dir"],
+        ),
+        # a bare config name needs no -cd
+        (["nvbenjo", "-cn", "my.yaml"], ["nvbenjo", "-cn", "my.yaml"]),
+        # an explicit config dir wins, argv is left alone instead of getting a second -cd
+        (
+            ["nvbenjo", "-cn", "/some/dir/my.yaml", "-cd", "/user/dir"],
+            ["nvbenjo", "-cn", "/some/dir/my.yaml", "-cd", "/user/dir"],
+        ),
+        (
+            ["nvbenjo", "--config-name", "/some/dir/my.yaml", "--config-dir", "/user/dir"],
+            ["nvbenjo", "--config-name", "/some/dir/my.yaml", "--config-dir", "/user/dir"],
+        ),
+        (["nvbenjo", "foo=1"], ["nvbenjo", "foo=1"]),
+    ],
+)
+def test_fix_config_path(argv, expected, monkeypatch):
+    monkeypatch.setattr(sys, "argv", list(argv))
+    _fix_config_path()
+    assert sys.argv == expected

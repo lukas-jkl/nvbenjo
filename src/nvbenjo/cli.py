@@ -68,7 +68,7 @@ def run(cfg: BenchConfig | DictConfig) -> None:
     plot.print_system_info(system_info)
     plot.print_results(results, custom_metric_keys=custom_metric_keys)
     logger.info(f"Benchmark finished, outputs in: {output_dir}")
-x
+
 
 def _collect_custom_metric_keys(models: dict) -> list[str]:
     """Custom batch metric keys of all models, de-duplicated and in config order.
@@ -82,7 +82,10 @@ def _fix_config_path():
     # NOTE: this is a workaround to allow specifying config file with full path
     #       since hydra only allows config name and config dir
     #       so for -cn /path/to/config.yaml we add -cd /path/to and change -cn to config.yaml
-    if "-cn" in sys.argv or "--config-name" in sys.argv and "-cd" not in sys.argv and "--config-dir" not in sys.argv:
+    #       an explicit -cd/--config-dir always wins, so we leave argv alone in that case
+    has_config_name = "-cn" in sys.argv or "--config-name" in sys.argv
+    has_config_dir = "-cd" in sys.argv or "--config-dir" in sys.argv
+    if has_config_name and not has_config_dir:
         arg_index = sys.argv.index("-cn") if "-cn" in sys.argv else sys.argv.index("--config-name")
         cfg_index = arg_index + 1
         if cfg_index <= len(sys.argv) - 1:
