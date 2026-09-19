@@ -202,9 +202,7 @@ class OnnxRuntimeConfig:
     """
 
     execution_providers: list[ProviderType] | None = None
-    graph_optimization_level: str = (
-        "ORT_ENABLE_ALL"  # 0 DISABLE_ALL, 1 BASIC, 2 EXTENDED, 3 LAYOUT, 99 ALL
-    )
+    graph_optimization_level: str = "ORT_ENABLE_ALL"  # 0 DISABLE_ALL, 1 BASIC, 2 EXTENDED, 3 LAYOUT, 99 ALL
     intra_op_num_threads: int = 1
     inter_op_num_threads: int = 0
     log_severity_level: int = 3  # Error
