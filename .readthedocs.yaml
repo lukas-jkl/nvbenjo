@@ -13,7 +13,7 @@ build:
     python: "3.13"
   commands:
     - pip install uv
-    - uv sync --dev
+    - uv sync --dev --extra onnx-cpu
     - uv run sphinx-build -b html docs/ $READTHEDOCS_OUTPUT/html
 
 # Build documentation in the "docs/" directory with Sphinx
