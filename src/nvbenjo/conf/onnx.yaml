@@ -5,7 +5,7 @@ defaults:
 nvbenjo:
   models:
     resnet:
-      # wget https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/resnet/model/resnet50-v2-7.onnx?download= ~/Downloads/resnet50-v2-7.onnx
+      # wget -O ~/Downloads/resnet50-v2-7.onnx https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/resnet/model/resnet50-v2-7.onnx
       type_or_path: ~/Downloads/resnet50-v2-7.onnx
       shape: [{"name": "data", "shape": [B, 3, 224, 224], "type": "float", "min_max": [0, 1]}]
       num_warmup_batches: 3
