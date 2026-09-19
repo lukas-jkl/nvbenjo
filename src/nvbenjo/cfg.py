@@ -385,6 +385,13 @@ def instantiate_model_configs(cfg: BenchConfig | DictConfig) -> dict[str, BaseMo
     for model_name, model in models.items():
         if isinstance(model, (OnnxModelConfig, TorchModelConfig)):
             for runtime_name, runtime in model.runtime_options.items():
+                if getattr(runtime, "cuda_graphs", False) and model.num_warmup_batches < 1:
+                    raise ValueError(
+                        f"Model '{model_name}' runtime option '{runtime_name}' enables cuda_graphs "
+                        f"but sets num_warmup_batches={model.num_warmup_batches}. CUDA graph "
+                        "capture needs at least one warm-up iteration to settle cuDNN lazy "
+                        "initialization."
+                    )
                 if runtime.enable_profiling:
                     if cfg.output_dir is None:
                         raise ValueError("output_dir must be set when profiling is enabled.")

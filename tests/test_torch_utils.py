@@ -321,3 +321,11 @@ def test_aot_cache_path_distinguishes_matmul_precision(tmp_path):
     }
 
     assert len(set(paths.values())) == len(paths), paths
+
+
+def test_cuda_graph_capture_rejects_zero_warmup():
+    # cuda_graphs + num_warmup_batches=0 is a legal config that used to die inside cuDNN with
+    # CUDNN_STATUS_INTERNAL_ERROR_DEVICE_ALLOCATION_FAILED, aborting every remaining combination
+    with pytest.raises(ValueError, match="at least one warm-up iteration"):
+        torch_utils._cuda_graph_capture(None, None, torch.device("cuda:0"), num_warmup_iters=0)
+

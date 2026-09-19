@@ -643,6 +643,13 @@ def _cuda_graph_capture(
     """
     if device.type != "cuda":
         raise ValueError(f"_graph_capture requires a CUDA device, got {device}")
+    if num_warmup_iters < 1:
+        # capturing straight away leaves cuDNN lazy init inside the graph and fails with an opaque
+        # CUDNN_STATUS_INTERNAL_ERROR_DEVICE_ALLOCATION_FAILED
+        raise ValueError(
+            "CUDA graph capture needs at least one warm-up iteration; "
+            "set num_warmup_batches >= 1 when cuda_graphs is enabled."
+        )
 
     static_input = transfer_to_device(batch, device)
 
