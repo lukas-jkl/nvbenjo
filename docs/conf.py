@@ -32,7 +32,6 @@ source_suffix = {
     ".md": "markdown",
 }
 
-templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # Napoleon settings for better NumPy-style formatting
 napoleon_google_docstring = False
@@ -57,7 +56,6 @@ intersphinx_mapping = {
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "shibuya"
-html_static_path = ["_static"]
 
 # Shibuya theme options
 html_theme_options = {

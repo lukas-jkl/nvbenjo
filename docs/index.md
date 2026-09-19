@@ -49,16 +49,25 @@ nvbenjo \
 ### Usage with Config File
 
 Or better, specify your own config (or one of the pre-defined config files)
-```
+```bash
 nvbenjo -cn small
 nvbenjo -cn="/my/config/path/myconfig.yaml"
 ```
 
-Override single arguments of your config
+Example for a small config with 2 batch sizes:
+
+```{eval-rst}
+.. literalinclude:: ../src/nvbenjo/conf/tiny.yaml
+   :language: yaml
+   :caption: tiny.yaml
 ```
+
+Everything else falls back to a default. Override single arguments of your config
+```bash
 nvbenjo -cn="/my/config/path/myconfig.yaml" nvbenjo.models.mymodel.num_batches=10
 ```
 
+A fuller config, with several precisions, profiling and an ONNX model:
 
 ```{eval-rst}
 .. literalinclude:: ../src/nvbenjo/conf/example.yaml

@@ -119,7 +119,9 @@ class TorchRuntimeConfig:
     compile_kwargs : dict
         Additional keyword arguments passed to ``torch.compile`` or ``aoti_compile_and_package``.
     precision : PrecisionType
-        Precision type for model inference (e.g., fp32, fp16, amp).
+        Precision for model inference, case-insensitive. One of ``FP32``, ``FP16``, ``BFLOAT16``,
+        ``FP8_E4M3FN``, ``FP8_E5M2``, ``LONG``, or the automatic mixed precision variants ``AMP``,
+        ``AMP_FP16``, ``AMP_BFLOAT16``.
     matmul_precision : str or None
         Precision for float32 matrix multiplications on GPUs with
         tensor cores (``torch.set_float32_matmul_precision``).
@@ -175,12 +177,16 @@ class OnnxRuntimeConfig:
 
     Parameters
     ----------
-    execution_providers : tuple of str or None
-        Tuple of execution providers to use (e.g., ('CPUExecutionProvider',
-        'CUDAExecutionProvider')). If None, uses the default provider.
+    execution_providers : list of str or (str, dict) pairs, optional
+        Execution providers in priority order. Each entry is either a provider name
+        (e.g. ``"CPUExecutionProvider"``) or a ``(name, options)`` pair
+        (e.g. ``["CUDAExecutionProvider", {"device_id": 0}]``). If None, CUDA devices get
+        ``CUDAExecutionProvider`` with a ``CPUExecutionProvider`` fallback, everything else
+        gets ``CPUExecutionProvider``.
     graph_optimization_level : str
-        Graph optimization level for ONNX Runtime. Options are 'ORT_ENABLE_ALL', 'ORT_ENABLE_LAYOUT',
-        'ORT_ENABLE_BASIC', 'ORT_DISABLE_ALL'.
+        Graph optimization level for ONNX Runtime, in increasing order of optimization:
+        'ORT_DISABLE_ALL', 'ORT_ENABLE_BASIC', 'ORT_ENABLE_EXTENDED', 'ORT_ENABLE_LAYOUT',
+        'ORT_ENABLE_ALL'.
     intra_op_num_threads : int
         Number of threads used to parallelize the execution within nodes.
     inter_op_num_threads : int
@@ -196,9 +202,7 @@ class OnnxRuntimeConfig:
     """
 
     execution_providers: list[ProviderType] | None = None
-    graph_optimization_level: str = (
-        "ORT_ENABLE_ALL"  # 99 ORT_ENABLE_ALL, 3 ORT_ENABLE_LAYOUT, 1 ORT_ENABLE_BASIC, 0 ORT_DISABLE_ALL
-    )
+    graph_optimization_level: str = "ORT_ENABLE_ALL"  # 0 DISABLE_ALL, 1 BASIC, 2 EXTENDED, 3 LAYOUT, 99 ALL
     intra_op_num_threads: int = 1
     inter_op_num_threads: int = 0
     log_severity_level: int = 3  # Error
