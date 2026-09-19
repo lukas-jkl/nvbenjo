@@ -1,0 +1,11 @@
+defaults:
+  - default
+  - _self_
+
+nvbenjo:
+  models:
+    resnet:                               # the name used in the results
+      type_or_path: torchvision:resnet50
+      shape: [B, 3, 224, 224]             # "B" is the batch size dimension
+      batch_sizes: [1, 8]
+      devices: ["cuda:0"]
