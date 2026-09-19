@@ -119,7 +119,9 @@ class TorchRuntimeConfig:
     compile_kwargs : dict
         Additional keyword arguments passed to ``torch.compile`` or ``aoti_compile_and_package``.
     precision : PrecisionType
-        Precision type for model inference (e.g., fp32, fp16, amp).
+        Precision for model inference, case-insensitive. One of ``FP32``, ``FP16``, ``BFLOAT16``,
+        ``FP8_E4M3FN``, ``FP8_E5M2``, ``LONG``, or the automatic mixed precision variants ``AMP``,
+        ``AMP_FP16``, ``AMP_BFLOAT16``.
     matmul_precision : str or None
         Precision for float32 matrix multiplications on GPUs with
         tensor cores (``torch.set_float32_matmul_precision``).
