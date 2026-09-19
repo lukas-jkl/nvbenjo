@@ -175,9 +175,12 @@ class OnnxRuntimeConfig:
 
     Parameters
     ----------
-    execution_providers : tuple of str or None
-        Tuple of execution providers to use (e.g., ('CPUExecutionProvider',
-        'CUDAExecutionProvider')). If None, uses the default provider.
+    execution_providers : list of str or (str, dict) pairs, optional
+        Execution providers in priority order. Each entry is either a provider name
+        (e.g. ``"CPUExecutionProvider"``) or a ``(name, options)`` pair
+        (e.g. ``["CUDAExecutionProvider", {"device_id": 0}]``). If None, CUDA devices get
+        ``CUDAExecutionProvider`` with a ``CPUExecutionProvider`` fallback, everything else
+        gets ``CPUExecutionProvider``.
     graph_optimization_level : str
         Graph optimization level for ONNX Runtime, in increasing order of optimization:
         'ORT_DISABLE_ALL', 'ORT_ENABLE_BASIC', 'ORT_ENABLE_EXTENDED', 'ORT_ENABLE_LAYOUT',
