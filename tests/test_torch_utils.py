@@ -19,6 +19,7 @@ from nvbenjo.torch_utils import (
     measure_gpu_memory_allocation,
     measure_repeated_inference_timing,
     run_model_with_input,
+    transfer_to_device,
 )
 from nvbenjo.utils import CompileMode, PrecisionType
 
@@ -329,3 +330,33 @@ def test_cuda_graph_capture_rejects_zero_warmup():
     with pytest.raises(ValueError, match="at least one warm-up iteration"):
         torch_utils._cuda_graph_capture(None, None, torch.device("cuda:0"), num_warmup_iters=0)
 
+
+# "meta" stands in for a real device move: it is available without a GPU
+META = torch.device("meta")
+
+
+def test_transfer_to_device_moves_tensors():
+    result = transfer_to_device({"x": torch.zeros(2), "nested": [torch.ones(3)]}, META)
+    assert result["x"].device.type == "meta"
+    assert result["nested"][0].device.type == "meta"
+
+    # a tuple comes back as a list, the container type is not preserved
+    result = transfer_to_device((torch.zeros(2), torch.ones(3)), META)
+    assert isinstance(result, list)
+    assert [r.device.type for r in result] == ["meta", "meta"]
+
+    assert transfer_to_device(torch.tensor([1.0, 2.0]), torch.device("cpu")).tolist() == [1.0, 2.0]
+
+    mixed = transfer_to_device((torch.tensor([1.0]), "a-label"), META)
+    assert mixed[0].device.type == "meta"
+    assert mixed[1] == "a-label"
+
+
+@pytest.mark.parametrize("value", ["a-label", ["a-label"], b"raw"], ids=["str", "list_of_str", "bytes"])
+def test_transfer_to_device_returns_strings_unchanged(value):
+    assert transfer_to_device(value, torch.device("cpu")) == value
+
+
+def test_transfer_to_device_rejects_unsupported_types():
+    with pytest.raises(ValueError, match="Unsupported result type"):
+        transfer_to_device(5, torch.device("cpu"))

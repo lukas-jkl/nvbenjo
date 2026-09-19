@@ -193,6 +193,10 @@ def run_model_with_input(model: nn.Module | Callable, input: TensorLike) -> Tens
 def transfer_to_device(result: ty.Any, to_device: torch.device) -> ty.Any:
     if hasattr(result, "to"):
         return result.to(to_device)
+    if isinstance(result, (str, bytes)):
+        # a str is a Sequence of length-1 strs, so recursing would never bottom out;
+        # nothing to transfer either way, so hand it back untouched
+        return result
     if isinstance(result, Sequence):
         return [transfer_to_device(ri, to_device=to_device) for ri in result]
     elif hasattr(result, "items"):
