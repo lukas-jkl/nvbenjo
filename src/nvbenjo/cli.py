@@ -78,26 +78,48 @@ def _collect_custom_metric_keys(models: dict) -> list[str]:
     return list(dict.fromkeys(key for mcfg in models.values() for key in mcfg.custom_batchmetrics))
 
 
+_CONFIG_NAME_FLAGS = ("-cn", "--config-name")
+_CONFIG_DIR_FLAGS = ("-cd", "--config-dir")
+
+
+def _find_flag(argv: list[str], flags: tuple[str, ...]) -> tuple[int, str, str] | None:
+    """Locate ``flag <value>`` or ``flag=<value>`` in ``argv``.
+
+    Both spellings have to be handled. 
+    Returns ``(index, prefix, value)``, where the value is
+    rewritten with ``argv[index] = prefix + new_value``.
+    """
+    for i, arg in enumerate(argv):
+        if arg in flags:
+            return (i + 1, "", argv[i + 1]) if i + 1 < len(argv) else None
+        for flag in flags:
+            if arg.startswith(f"{flag}="):
+                return i, f"{flag}=", arg[len(flag) + 1 :]
+    return None
+
+
 def _fix_config_path():
     # NOTE: this is a workaround to allow specifying config file with full path
     #       since hydra only allows config name and config dir
     #       so for -cn /path/to/config.yaml we add -cd /path/to and change -cn to config.yaml
     #       an explicit -cd/--config-dir always wins, so we leave argv alone in that case
-    has_config_name = "-cn" in sys.argv or "--config-name" in sys.argv
-    has_config_dir = "-cd" in sys.argv or "--config-dir" in sys.argv
-    if has_config_name and not has_config_dir:
-        arg_index = sys.argv.index("-cn") if "-cn" in sys.argv else sys.argv.index("--config-name")
-        cfg_index = arg_index + 1
-        if cfg_index <= len(sys.argv) - 1:
-            config_name = sys.argv[cfg_index]
-            if os.path.dirname(config_name):
-                sys.argv.append("-cd")
-                sys.argv.append(os.path.dirname(config_name))
-                sys.argv[cfg_index] = os.path.basename(config_name)
-                logger.debug("Sys argv: " + str(sys.argv))
-                logger.debug(
-                    f"Adjusted config path, using -cd {os.path.dirname(config_name)} and -cn {os.path.basename(config_name)}"
-                )
+    if _find_flag(sys.argv, _CONFIG_DIR_FLAGS) is not None:
+        return
+
+    found = _find_flag(sys.argv, _CONFIG_NAME_FLAGS)
+    if found is None:
+        return
+
+    index, prefix, config_name = found
+    config_dir = os.path.dirname(config_name)
+    if not config_dir:
+        return
+
+    config_file = os.path.basename(config_name)
+    sys.argv[index] = prefix + config_file
+    sys.argv += ["-cd", config_dir]
+    logger.debug("Sys argv: " + str(sys.argv))
+    logger.debug(f"Adjusted config path, using -cd {config_dir} and -cn {config_file}")
 
 
 def nvbenjo():

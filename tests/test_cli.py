@@ -527,8 +527,14 @@ def test_collect_custom_metric_keys_keeps_config_order():
             ["nvbenjo", "--config-name", "/some/dir/my.yaml"],
             ["nvbenjo", "--config-name", "my.yaml", "-cd", "/some/dir"],
         ),
+        (["nvbenjo", "-cn=/some/dir/my.yaml"], ["nvbenjo", "-cn=my.yaml", "-cd", "/some/dir"]),
+        (
+            ["nvbenjo", "--config-name=/some/dir/my.yaml"],
+            ["nvbenjo", "--config-name=my.yaml", "-cd", "/some/dir"],
+        ),
         # a bare config name needs no -cd
         (["nvbenjo", "-cn", "my.yaml"], ["nvbenjo", "-cn", "my.yaml"]),
+        (["nvbenjo", "-cn=my.yaml"], ["nvbenjo", "-cn=my.yaml"]),
         # an explicit config dir wins, argv is left alone instead of getting a second -cd
         (
             ["nvbenjo", "-cn", "/some/dir/my.yaml", "-cd", "/user/dir"],
@@ -537,6 +543,10 @@ def test_collect_custom_metric_keys_keeps_config_order():
         (
             ["nvbenjo", "--config-name", "/some/dir/my.yaml", "--config-dir", "/user/dir"],
             ["nvbenjo", "--config-name", "/some/dir/my.yaml", "--config-dir", "/user/dir"],
+        ),
+        (
+            ["nvbenjo", "-cn=/some/dir/my.yaml", "-cd=/user/dir"],
+            ["nvbenjo", "-cn=/some/dir/my.yaml", "-cd=/user/dir"],
         ),
         (["nvbenjo", "foo=1"], ["nvbenjo", "foo=1"]),
     ],
