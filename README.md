@@ -64,4 +64,8 @@ uv run nvbenjo -cn small
 # tests
 uv run pytest
 uv run nox
+
+# docs
+uv run --extra onnx-cpu sphinx-build -b html docs docs/_build/html
+google-chrome docs/_build/html/index.html
 ```
