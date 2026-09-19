@@ -179,8 +179,9 @@ class OnnxRuntimeConfig:
         Tuple of execution providers to use (e.g., ('CPUExecutionProvider',
         'CUDAExecutionProvider')). If None, uses the default provider.
     graph_optimization_level : str
-        Graph optimization level for ONNX Runtime. Options are 'ORT_ENABLE_ALL', 'ORT_ENABLE_LAYOUT',
-        'ORT_ENABLE_BASIC', 'ORT_DISABLE_ALL'.
+        Graph optimization level for ONNX Runtime, in increasing order of optimization:
+        'ORT_DISABLE_ALL', 'ORT_ENABLE_BASIC', 'ORT_ENABLE_EXTENDED', 'ORT_ENABLE_LAYOUT',
+        'ORT_ENABLE_ALL'.
     intra_op_num_threads : int
         Number of threads used to parallelize the execution within nodes.
     inter_op_num_threads : int
@@ -197,7 +198,7 @@ class OnnxRuntimeConfig:
 
     execution_providers: list[ProviderType] | None = None
     graph_optimization_level: str = (
-        "ORT_ENABLE_ALL"  # 99 ORT_ENABLE_ALL, 3 ORT_ENABLE_LAYOUT, 1 ORT_ENABLE_BASIC, 0 ORT_DISABLE_ALL
+        "ORT_ENABLE_ALL"  # 0 DISABLE_ALL, 1 BASIC, 2 EXTENDED, 3 LAYOUT, 99 ALL
     )
     intra_op_num_threads: int = 1
     inter_op_num_threads: int = 0
