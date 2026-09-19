@@ -85,7 +85,7 @@ _CONFIG_DIR_FLAGS = ("-cd", "--config-dir")
 def _find_flag(argv: list[str], flags: tuple[str, ...]) -> tuple[int, str, str] | None:
     """Locate ``flag <value>`` or ``flag=<value>`` in ``argv``.
 
-    Both spellings have to be handled. 
+    Both spellings have to be handled.
     Returns ``(index, prefix, value)``, where the value is
     rewritten with ``argv[index] = prefix + new_value``.
     """
