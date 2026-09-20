@@ -50,6 +50,29 @@ nvbenjo -cn="/my/config/path/myconfig.yaml" --help
 
 Take a look at the [Documentation](https://nvbenjo.readthedocs.io) for more information as well as example configurations.
 
+## Docker
+
+The image bundles nvbenjo, its CUDA dependencies and [nvbandwidth](https://github.com/NVIDIA/nvbandwidth).
+
+```bash
+# build (the Onnx Runtime GPU backend is included by default)
+docker build -t nvbenjo .
+
+# run
+mkdir -p outputs
+docker run --rm -it --gpus all \
+    -v "$PWD/outputs:/outputs" \
+    -v nvbenjo-torch-cache:/root/.cache/torch \
+    nvbenjo \
+    nvbenjo -cn small
+```
+
+`nvbandwidth` is on the PATH as well:
+
+```bash
+docker run --rm --gpus all nvbenjo nvbandwidth
+```
+
 ## Development
 
 Example using uv:

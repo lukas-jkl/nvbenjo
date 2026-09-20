@@ -14,9 +14,17 @@ from omegaconf.dictconfig import DictConfig
 from omegaconf.listconfig import ListConfig
 from rich.progress import Progress
 
+from . import console
+
+_warned_device_fallback = False
+
 BATCH_SIZE_IDENTIFIERS = ("B", "batch_size")
 TRANSFER_WARNING = (
     "[yellow]Warning: Could not transfer model output to CPU. Time to CPU measures will be incorrect.[/yellow]"
+)
+DEVICE_FALLBACK_WARNING = (
+    "[yellow]Warning: NVML could not attribute GPU memory to this process, reporting device-wide usage which "
+    "includes any other GPU user. In a container, run with --pid=host for per-process numbers.[/yellow]"
 )
 
 SingleShape = tuple[int | str, ...] | dict[str, ty.Any]
@@ -239,7 +247,12 @@ def sample_gpu_memory(
 
     Uses pynvml to read per-process GPU memory, capturing all allocations
     including CUDA context, graph memory, compiled kernels, etc.
+
+    NVML reports host PIDs, which never match ours inside a container. Only then
+    do we fall back to device-wide usage, which also counts other GPU users.
     """
+    global _warned_device_fallback
+
     if device.type != "cuda":
         max_mem[0] = -1
         return
@@ -250,6 +263,7 @@ def sample_gpu_memory(
     handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
     pid = os.getpid()
 
+    device_mem = -1
     while not stop_event.is_set():
         for proc in pynvml.nvmlDeviceGetComputeRunningProcesses(handle):
             if proc.pid == pid:
@@ -257,4 +271,12 @@ def sample_gpu_memory(
                 if isinstance(mem, int) and mem > max_mem[0]:
                     max_mem[0] = mem
                 break
+        if max_mem[0] < 0:
+            device_mem = max(device_mem, pynvml.nvmlDeviceGetMemoryInfo(handle).used)
         time.sleep(sample_time_s)
+
+    if max_mem[0] < 0:
+        max_mem[0] = device_mem
+        if not _warned_device_fallback:
+            _warned_device_fallback = True
+            console.print(DEVICE_FALLBACK_WARNING)
