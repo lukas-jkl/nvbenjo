@@ -17,3 +17,7 @@ outputs
 .git
 .pytest_cache
 *.log
+.nox
+.coverage
+htmlcov
+docs/_build
