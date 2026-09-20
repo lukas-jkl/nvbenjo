@@ -14,3 +14,6 @@ build
 
 Dockerfile
 outputs
+.git
+.pytest_cache
+*.log
