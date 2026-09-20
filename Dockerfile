@@ -30,8 +30,8 @@ FROM nvidia/cuda:12.8.1-base-ubuntu22.04
 
 # Pass the version 
 ARG NVBENJO_VERSION=0.0.0.dev0
-# Set to '[onnx-gpu]' to include the ONNX Runtime backend (~250 MB).
-ARG NVBENJO_EXTRAS=""
+# Set to '' to build without the Onnx Runtime GPU backend (~250 MB).
+ARG NVBENJO_EXTRAS="[onnx-gpu]"
 ENV SETUPTOOLS_SCM_PRETEND_VERSION=${NVBENJO_VERSION}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
