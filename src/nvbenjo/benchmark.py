@@ -411,11 +411,12 @@ def benchmark_model(
                     else:
                         _run_warmup(model, batch, device, model_cfg.num_warmup_batches, progress_bar)
                     if measure_memory:
-                        torch_memory_alloc, gpu_memory_alloc = torch_utils.measure_gpu_memory_allocation(
-                            model, batch, device
+                        torch_memory_alloc, torch_memory_reserved, gpu_memory_alloc = (
+                            torch_utils.measure_gpu_memory_allocation(model, batch, device)
                         )
                     else:
                         torch_memory_alloc = 0
+                        torch_memory_reserved = 0
                         gpu_memory_alloc = 0
                     if runtime_cfg.enable_profiling:
                         profiler_kwargs = dict(runtime_cfg.profiler_kwargs)
@@ -477,6 +478,7 @@ def benchmark_model(
                     )
 
                 torch_memory_alloc = None  # no memory allocation can be measured for onnx
+                torch_memory_reserved = None
                 if measure_memory:
                     gpu_memory_alloc = onnx_utils.measure_gpu_memory_allocation(model, batch, device)
                 else:
@@ -494,6 +496,7 @@ def benchmark_model(
                 raise TypeError(f"Unknown model config type {type(model_cfg)}")
 
             cur_results["torch_memory_bytes"] = torch_memory_alloc
+            cur_results["torch_memory_reserved_bytes"] = torch_memory_reserved
             cur_results["gpu_memory_bytes"] = gpu_memory_alloc
             # benchmark_models() overwrites this with the model's config key, a standalone
             # benchmark_model() call may get a config that was never named

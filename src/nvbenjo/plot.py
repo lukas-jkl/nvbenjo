@@ -18,7 +18,7 @@ from .utils import format_num, format_seconds
 
 
 class MemoryBar:
-    """A composite bar showing torch allocator memory (red) and remaining process memory (white)."""
+    """A composite bar showing torch reserved memory (red) and remaining process memory (white)."""
 
     FULL_BLOCK = "█"
 
@@ -77,7 +77,7 @@ DEFAULT_PLOT_KEYS = (
     "time_device_to_cpu",
     "time_inference",
     "time_total_batch_normalized",
-    "torch_memory_bytes",
+    "torch_memory_reserved_bytes",
     "gpu_memory_bytes",
 )
 
@@ -191,23 +191,28 @@ def _print_device_results(
     device_results["device"] = device  # Add device column back for display
     print_result = device_results.reset_index()
 
+    # Only the reserved torch memory is displayed, the allocated peak stays in the raw results
+    print_result = print_result.drop(columns=["torch_memory_bytes"], errors="ignore")
+
     # Remove columns where all values are None
     print_result = print_result.dropna(axis="columns", how="all")
 
     # Merge memory columns into a single combined column
     has_process_mem = _has_mem(print_result, "gpu_memory_bytes")
-    has_torch_mem = _has_mem(print_result, "torch_memory_bytes")
+    has_torch_mem = _has_mem(print_result, "torch_memory_reserved_bytes")
     if has_process_mem and has_torch_mem:
-        print_result["memory"] = list(zip(print_result["torch_memory_bytes"], print_result["gpu_memory_bytes"]))
-        print_result = print_result.drop(columns=["torch_memory_bytes", "gpu_memory_bytes"])
+        print_result["memory"] = list(
+            zip(print_result["torch_memory_reserved_bytes"], print_result["gpu_memory_bytes"])
+        )
+        print_result = print_result.drop(columns=["torch_memory_reserved_bytes", "gpu_memory_bytes"])
         memory_col_header = "Memory: Torch (Process)"
     elif has_process_mem:
         print_result["memory"] = print_result["gpu_memory_bytes"]
         print_result = print_result.drop(columns=["gpu_memory_bytes"])
         memory_col_header = "Process Memory"
     elif has_torch_mem:
-        print_result["memory"] = print_result["torch_memory_bytes"]
-        print_result = print_result.drop(columns=["torch_memory_bytes"])
+        print_result["memory"] = print_result["torch_memory_reserved_bytes"]
+        print_result = print_result.drop(columns=["torch_memory_reserved_bytes"])
         memory_col_header = "Torch Memory"
     else:
         raise RuntimeError("Invalid Memory Column")
@@ -296,7 +301,7 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: S
     table.add_column("", justify="right")
     mem_header = Text()
 
-    if _has_mem(results, "torch_memory_bytes"):
+    if _has_mem(results, "torch_memory_reserved_bytes"):
         mem_header.append("Torch Memory", style="bold red")
         mem_header.append(" / ", style="bold")
     mem_header.append("Process Memory", style="bold bright_white")
@@ -307,7 +312,7 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: S
     max_process_mem = (
         results.gpu_memory_bytes.max().item()
         if _has_mem(results, "gpu_memory_bytes")
-        else results.torch_memory_bytes.max().item()
+        else results.torch_memory_reserved_bytes.max().item()
     )
     for model in results.model.unique():
         model_results = results[results.model == model]
@@ -329,7 +334,9 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: S
             for _, res in print_result.iterrows():
                 first_val = res[first_metric]
                 gpu_mem_val = res.gpu_memory_bytes
-                torch_mem_val = res.torch_memory_bytes if _has_mem(res, "torch_memory_bytes") else gpu_mem_val
+                torch_mem_val = (
+                    res.torch_memory_reserved_bytes if _has_mem(res, "torch_memory_reserved_bytes") else gpu_mem_val
+                )
                 table.add_row(
                     Text(model, style="green"),
                     Text(res.runtime_options, style="blue"),
