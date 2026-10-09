@@ -290,11 +290,12 @@ def get_model_parameters(model: nn.Module) -> int:
 @torch.no_grad()
 def measure_gpu_memory_allocation(
     model: nn.Module | Callable, batch: TensorLike, device: torch.device, iterations: int = 3
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     """Measure peak memory usage during inference.
 
-    Returns both the PyTorch allocator peak (via torch.cuda.max_memory_allocated)
-    and the process-level GPU memory peak (via pynvml sampling).
+    Returns the PyTorch allocator peak of live tensors (via torch.cuda.max_memory_allocated),
+    the PyTorch caching-allocator reserved peak (via torch.cuda.max_memory_reserved) and the
+    process-level GPU memory peak (via pynvml sampling).
 
     Parameters
     ----------
@@ -309,9 +310,9 @@ def measure_gpu_memory_allocation(
 
     Returns
     -------
-    tuple[int, int]
-        (torch_memory_bytes, gpu_memory_bytes) — PyTorch allocator peak and
-        process-level GPU memory peak.
+    tuple[int, int, int]
+        (torch_memory_bytes, torch_memory_reserved_bytes, gpu_memory_bytes) — PyTorch allocated
+        peak, PyTorch reserved peak and process-level GPU memory peak.
     """
     is_cuda = device.type == "cuda"
 
@@ -342,12 +343,14 @@ def measure_gpu_memory_allocation(
     if is_cuda:
         logger.debug(torch.cuda.memory_summary(device=device, abbreviated=True))
         torch_memory = torch.cuda.max_memory_allocated(device=device)
+        torch_memory_reserved = torch.cuda.max_memory_reserved(device=device)
         gpu_memory = max_mem[0]
     else:
         torch_memory = -1
+        torch_memory_reserved = -1
         gpu_memory = -1
 
-    return torch_memory, gpu_memory
+    return torch_memory, torch_memory_reserved, gpu_memory
 
 
 @torch.no_grad()

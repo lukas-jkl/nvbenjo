@@ -59,7 +59,7 @@ def run(cfg: BenchConfig | DictConfig) -> None:
                 "time_device_to_cpu",
                 "time_inference",
                 "time_total_batch_normalized",
-                "torch_memory_bytes",
+                "torch_memory_reserved_bytes",
                 "gpu_memory_bytes",
             ]
             + custom_metric_keys,

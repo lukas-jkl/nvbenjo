@@ -62,7 +62,7 @@ def _check_run_files(cfg: omegaconf.DictConfig):
         if not model_cfg.get("type_or_path", "").endswith(".onnx") and not model_cfg.get("type_or_path", "").startswith(
             "onnx:"
         ):
-            expected_files.append(join(model_name, "torch_memory_bytes.png"))
+            expected_files.append(join(model_name, "torch_memory_reserved_bytes.png"))
     if len(cfg.nvbenjo.models) > 1:
         expected_files.append(join("summary", "time_inference.png"))
         expected_files.append(join("summary", "time_total_batch_normalized.png"))
