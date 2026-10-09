@@ -10,7 +10,7 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig, OmegaConf
 from rich.logging import RichHandler
 
-from . import console, plot
+from . import console, plot, utils
 from .benchmark import benchmark_models
 from .cfg import BenchConfig, instantiate_model_configs
 from .system_info import get_system_info
@@ -28,6 +28,7 @@ def _run_nvbenjo(cfg: BenchConfig | DictConfig):
 
 def run(cfg: BenchConfig | DictConfig) -> None:
     logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(console=console)])
+    utils.load_extra_imports(cfg.nvbenjo.extra_imports)
     models = instantiate_model_configs(cfg)
     if cfg.output_dir is not None:
         output_dir = os.path.abspath(cfg.output_dir)

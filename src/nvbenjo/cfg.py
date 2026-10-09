@@ -77,12 +77,17 @@ class NvbenjoConfig:
     ----------
     measure_memory : bool
         Whether to measure GPU memory allocation during benchmarking.
+    extra_imports : list of str
+        Loaded before any model, e.g. to register custom ops. Each entry is a module name
+        (``mypkg.ops``), a Python file (``./my_ops.py``) or a compiled op library loaded via
+        ``torch.ops.load_library`` (``./libmyops.so``). Paths are relative to the working directory.
     models: dict[str, TorchModelConfig | OnnxModelConfig]
         Dictionary mapping model names to their configurations.
         See :class:`TorchModelConfig` and :class:`OnnxModelConfig` for details.
     """
 
     measure_memory: bool = True
+    extra_imports: list[str] = field(default_factory=list)
     models: dict[str, ty.Any] = field(default_factory=dict)
 
 

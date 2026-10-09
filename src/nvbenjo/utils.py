@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import os
+import sys
 import threading
 import time
 import typing as ty
@@ -238,6 +241,34 @@ def progress_task(progress: Progress | None, task_name: str, **kwargs):
             yield task
         finally:
             progress.remove_task(task)
+
+
+def load_extra_imports(entries: ty.Iterable[str]) -> None:
+    """Load modules, Python files or compiled op libraries, e.g. to register custom ops before models load.
+
+    Parameters
+    ----------
+    entries : Iterable[str]
+        Module names (``mypkg.ops``), Python files (``./my_ops.py``) or shared libraries
+        (``./libmyops.so``, loaded via ``torch.ops.load_library``).
+    """
+    for entry in entries:
+        path = os.path.expanduser(entry)
+        try:
+            if path.endswith(".so"):
+                torch.ops.load_library(path)
+            elif path.endswith(".py"):
+                name = f"nvbenjo_extra_{os.path.splitext(os.path.basename(path))[0]}"
+                spec = importlib.util.spec_from_file_location(name, path)
+                if spec is None or spec.loader is None:
+                    raise ImportError(f"Can't create a module spec for {path}")
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[name] = module
+                spec.loader.exec_module(module)
+            else:
+                importlib.import_module(entry)
+        except Exception as e:
+            raise ImportError(f"Failed to load extra_imports entry '{entry}': {e}") from e
 
 
 def warn_if_gpus_busy(devices: ty.Iterable[str], max_utilization: int = 5) -> None:

@@ -66,6 +66,10 @@ include = [
 [tool.coverage.run]
 omit = ["noxfile.py"]
 
+[tool.pytest.ini_options]
+# only keep tmp_path directories of failed tests for debugging
+tmp_path_retention_policy = "failed"
+
 [tool.ruff]
 line-length = 120
 [tool.ruff.lint.pydocstyle]
