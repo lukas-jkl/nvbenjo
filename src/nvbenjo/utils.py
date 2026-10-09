@@ -312,7 +312,12 @@ def sample_gpu_memory(
     pynvml.nvmlInit()
     # a bare "cuda" carries no index -> resolve current one if needed
     device_index = device.index if device.index is not None else torch.cuda.current_device()
-    handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
+    try:
+        # torch renumbers the GPUs in CUDA_VISIBLE_DEVICES, NVML always uses physical indices
+        nvml_index = torch.cuda._get_nvml_device_index(device_index)
+    except Exception:  # noqa: BLE001 - private torch helper (torch >= 2.1), fall back to the unmapped index
+        nvml_index = device_index
+    handle = pynvml.nvmlDeviceGetHandleByIndex(nvml_index)
     pid = os.getpid()
 
     device_mem = -1

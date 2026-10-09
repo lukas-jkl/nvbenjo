@@ -14,6 +14,7 @@ from nvbenjo.utils import (
     format_seconds,
     get_rnd_from_shape_s,
     load_extra_imports,
+    sample_gpu_memory,
     warn_if_gpus_busy,
 )
 
@@ -259,3 +260,16 @@ def test_load_extra_imports_so(load_library):
 def test_load_extra_imports_failure(entry):
     with pytest.raises(ImportError, match=entry):
         load_extra_imports([entry])
+
+
+@pytest.mark.parametrize("visible,device,nvml_index", [(None, "cuda:1", 1), ("3,5", "cuda:0", 3), ("3,5", "cuda:1", 5)])
+def test_sample_gpu_memory_maps_cuda_visible_devices(monkeypatch, visible, device, nvml_index):
+    if visible is None:
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    else:
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", visible)
+    stop_event = MagicMock()
+    stop_event.is_set.return_value = True
+    with patch("nvbenjo.utils.pynvml") as nvml, patch("nvbenjo.utils.console"):
+        sample_gpu_memory(torch.device(device), stop_event, [-1])
+    nvml.nvmlDeviceGetHandleByIndex.assert_called_once_with(nvml_index)
