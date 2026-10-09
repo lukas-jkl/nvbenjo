@@ -240,6 +240,27 @@ def progress_task(progress: Progress | None, task_name: str, **kwargs):
             progress.remove_task(task)
 
 
+def warn_if_gpus_busy(devices: ty.Iterable[str], max_utilization: int = 5) -> None:
+    """Warn if a CUDA device is already busy before benchmarking starts.
+
+    Other workloads on the same GPU inflate the measured timings.
+    """
+    if not torch.cuda.is_available():
+        return
+    # pass explicit indices, resolving a bare "cuda" via torch would create a CUDA context
+    indices = sorted({torch.device(d).index or 0 for d in devices if torch.device(d).type == "cuda"})
+    for index in indices:
+        try:
+            utilization = torch.cuda.utilization(index)
+        except Exception:  # noqa: BLE001 - NVML may be missing or unsupported; skip the check
+            return
+        if utilization > max_utilization:
+            console.print(
+                f"[yellow]Warning: cuda:{index} is already at {utilization}% utilization. "
+                "Timings may be inflated by other workloads.[/yellow]"
+            )
+
+
 def sample_gpu_memory(
     device: torch.device, stop_event: threading.Event, max_mem: list[int], sample_time_s: float = 0.010
 ):

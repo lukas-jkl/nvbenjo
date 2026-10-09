@@ -12,6 +12,7 @@ from nvbenjo.utils import (
     format_num,
     format_seconds,
     get_rnd_from_shape_s,
+    warn_if_gpus_busy,
 )
 
 
@@ -205,3 +206,15 @@ def test_get_rnd_shape_int_with_list_value():
     )
     assert rnd["a"].shape == (2, 3)
     assert rnd["a"].tolist() == [[1, 2, 3], [1, 2, 3]]
+
+
+@pytest.mark.parametrize("utilization,warns", [(0, False), (50, True)])
+@patch("torch.cuda.is_available", return_value=True)
+def test_warn_if_gpus_busy(_, utilization, warns):
+    with (
+        patch("torch.cuda.utilization", return_value=utilization) as util,
+        patch("nvbenjo.utils.console") as console,
+    ):
+        warn_if_gpus_busy(["cpu", "cuda", "cuda:0", "cuda:1"])
+    assert [c.args for c in util.call_args_list] == [(0,), (1,)]
+    assert console.print.called == warns

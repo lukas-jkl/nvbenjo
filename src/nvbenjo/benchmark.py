@@ -106,6 +106,7 @@ def benchmark_models(model_cfgs: dict[str, BaseModelConfig], measure_memory: boo
         )
         results = benchmark.benchmark_models({"model_1": model_cfg})
     """
+    utils.warn_if_gpus_busy(d for model_cfg in model_cfgs.values() for d in model_cfg.devices)
     _test_load_models(model_cfgs)
 
     with _get_progress_bar() as progress_bar:
