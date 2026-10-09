@@ -284,8 +284,11 @@ class TorchModelConfig(BaseModelConfig):
             compile_modes = {
                 rt._compile_mode for rt in self.runtime_options.values() if isinstance(rt, TorchRuntimeConfig)
             }
-            if compile_modes - {CompileMode.NONE}:
-                logger.warning(f"Model '{self.name}' is pre-exported — setting compile has no effect.")
+            # an exported program can still be compiled, an AOTI package is already compiled
+            if self.type_or_path.startswith("aot:") and compile_modes - {CompileMode.NONE}:
+                logger.warning(
+                    f"Model '{self.name}' is already AOT compiled — setting compile re-compiles the compiled model."
+                )
 
 
 @dataclass
