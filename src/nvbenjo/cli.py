@@ -45,7 +45,7 @@ def run(cfg: BenchConfig | DictConfig) -> None:
     results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory)
 
     if output_dir is not None:
-        results.to_csv(join(output_dir, "out.csv"))
+        results.to_csv(join(output_dir, "out.csv"), index=False)
         with open(join(output_dir, "config.yaml"), "w") as f:
             f.write(OmegaConf.to_yaml(cfg))
 
