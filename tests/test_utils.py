@@ -1,3 +1,4 @@
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,6 +13,7 @@ from nvbenjo.utils import (
     format_num,
     format_seconds,
     get_rnd_from_shape_s,
+    load_extra_imports,
     warn_if_gpus_busy,
 )
 
@@ -218,3 +220,42 @@ def test_warn_if_gpus_busy(_, utilization, warns):
         warn_if_gpus_busy(["cpu", "cuda", "cuda:0", "cuda:1"])
     assert [c.args for c in util.call_args_list] == [(0,), (1,)]
     assert console.print.called == warns
+
+
+def test_load_extra_imports_py_file(tmp_path):
+    ops_file = tmp_path / "my_ops.py"
+    ops_file.write_text(
+        "import torch\n"
+        "@torch.library.custom_op('nvbenjo_test::double', mutates_args=())\n"
+        "def double(x: torch.Tensor) -> torch.Tensor:\n"
+        "    return x * 2\n"
+    )
+    load_extra_imports([str(ops_file)])
+    assert torch.equal(torch.ops.nvbenjo_test.double(torch.ones(2)), torch.full((2,), 2.0))
+
+
+def test_load_extra_imports_module(tmp_path, monkeypatch):
+    pkg = tmp_path / "nvbenjo_test_pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "ops.py").write_text(
+        "import torch\n"
+        "@torch.library.custom_op('nvbenjo_test::triple', mutates_args=())\n"
+        "def triple(x: torch.Tensor) -> torch.Tensor:\n"
+        "    return x * 3\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    load_extra_imports(["nvbenjo_test_pkg.ops"])
+    assert torch.equal(torch.ops.nvbenjo_test.triple(torch.ones(2)), torch.full((2,), 3.0))
+
+
+@patch("torch.ops.load_library")
+def test_load_extra_imports_so(load_library):
+    load_extra_imports(["~/libmyops.so"])
+    load_library.assert_called_once_with(os.path.expanduser("~/libmyops.so"))
+
+
+@pytest.mark.parametrize("entry", ["nvbenjo_no_such_module", "/no/such/ops.py"])
+def test_load_extra_imports_failure(entry):
+    with pytest.raises(ImportError, match=entry):
+        load_extra_imports([entry])
