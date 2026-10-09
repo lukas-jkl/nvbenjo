@@ -16,6 +16,7 @@ footer: |
   nvbenjo:
     measure_memory: true
     extra_imports: []  # e.g. [mypkg.ops, ./my_ops.py, ./libmyops.so] to register custom ops
+    timing_basis: total  # summary + custom metrics on total (with device copies) or inference time
     models:
       resnet50:
         type_or_path: torchvision:resnet50

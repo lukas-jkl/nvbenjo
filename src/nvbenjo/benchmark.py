@@ -66,7 +66,9 @@ def _test_load_models(model_cfgs: dict[str, BaseModelConfig]) -> None:
             loaded_types.append(model_cfg.type_or_path)
 
 
-def benchmark_models(model_cfgs: dict[str, BaseModelConfig], measure_memory: bool | None = True) -> pd.DataFrame:
+def benchmark_models(
+    model_cfgs: dict[str, BaseModelConfig], measure_memory: bool | None = True, timing_basis: str = "total"
+) -> pd.DataFrame:
     """Benchmark the given models.
 
     Parameters
@@ -74,6 +76,9 @@ def benchmark_models(model_cfgs: dict[str, BaseModelConfig], measure_memory: boo
     model_cfgs : Dict[str, :class:`~nvbenjo.cfg.TorchModelConfig` | :class:`~nvbenjo.cfg.OnnxModelConfig`]
     measure_memory : bool, optional
         Whether to measure memory usage during benchmarking, by default True
+    timing_basis : str, optional
+        Time the custom batch metrics are based on: 'total' (including data transfer to and from
+        the device) or 'inference' (device time only), by default 'total'
 
     Returns
     -------
@@ -106,6 +111,8 @@ def benchmark_models(model_cfgs: dict[str, BaseModelConfig], measure_memory: boo
         )
         results = benchmark.benchmark_models({"model_1": model_cfg})
     """
+    if timing_basis not in ("total", "inference"):
+        raise ValueError(f"Invalid timing_basis '{timing_basis}', must be 'total' or 'inference'")
     utils.warn_if_gpus_busy(d for model_cfg in model_cfgs.values() for d in model_cfg.devices)
     _test_load_models(model_cfgs)
 
@@ -120,7 +127,9 @@ def benchmark_models(model_cfgs: dict[str, BaseModelConfig], measure_memory: boo
             model_results = benchmark_model(model_cfg, progress_bar=progress_bar, measure_memory=measure_memory)
             model_results["model"] = model_name
             if model_cfg.custom_batchmetrics:
-                model_results = utils.calculate_batchmetrics(model_results, model_cfg.custom_batchmetrics)
+                model_results = utils.calculate_batchmetrics(
+                    model_results, model_cfg.custom_batchmetrics, timing_basis=timing_basis
+                )
             results.append(model_results)
             progress_bar.advance(model_task)
 

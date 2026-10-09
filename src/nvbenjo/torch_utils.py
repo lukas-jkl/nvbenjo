@@ -448,6 +448,7 @@ def measure_repeated_inference_timing(
                     "time_device_to_cpu": stop_on_cpu - stop_on_device,
                     "time_total": stop_on_cpu - start_on_cpu,
                     "time_total_batch_normalized": (stop_on_cpu - start_on_cpu) / batch_size,
+                    "time_inference_batch_normalized": elapsed_on_device / batch_size,
                 }
             )
             if progress_callback is not None:

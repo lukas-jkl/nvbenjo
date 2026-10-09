@@ -3,6 +3,8 @@ defaults:
   - _self_
 
 nvbenjo:
+  # Basis for the summary and custom batch metrics: "total" (incl. host<->device copies) or "inference" (device only)
+  timing_basis: total
   models:
     shufflenet_torch:
       # Directly uses a model part of torchvision but you may also specify a local path or a Hugging Face model identifier

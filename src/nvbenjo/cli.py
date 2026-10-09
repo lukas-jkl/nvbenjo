@@ -43,7 +43,7 @@ def run(cfg: BenchConfig | DictConfig) -> None:
     if len(models) == 0:
         logger.info("No models to benchmark, please specify a configuration or override via the command line.")
         return
-    results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory)
+    results = benchmark_models(models, measure_memory=cfg.nvbenjo.measure_memory, timing_basis=cfg.nvbenjo.timing_basis)
 
     if output_dir is not None:
         results.to_csv(join(output_dir, "out.csv"), index=False)
@@ -67,7 +67,7 @@ def run(cfg: BenchConfig | DictConfig) -> None:
             output_dir=output_dir,
         )
     plot.print_system_info(system_info)
-    plot.print_results(results, custom_metric_keys=custom_metric_keys)
+    plot.print_results(results, custom_metric_keys=custom_metric_keys, timing_basis=cfg.nvbenjo.timing_basis)
     logger.info(f"Benchmark finished, outputs in: {output_dir}")
 
 

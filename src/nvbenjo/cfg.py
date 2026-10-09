@@ -81,6 +81,9 @@ class NvbenjoConfig:
         Loaded before any model, e.g. to register custom ops. Each entry is a module name
         (``mypkg.ops``), a Python file (``./my_ops.py``) or a compiled op library loaded via
         ``torch.ops.load_library`` (``./libmyops.so``). Paths are relative to the working directory.
+    timing_basis : str
+        Time used for the summary and custom batch metrics: ``"total"`` (including data transfer
+        to and from the device) or ``"inference"`` (device time only).
     models: dict[str, TorchModelConfig | OnnxModelConfig]
         Dictionary mapping model names to their configurations.
         See :class:`TorchModelConfig` and :class:`OnnxModelConfig` for details.
@@ -88,6 +91,7 @@ class NvbenjoConfig:
 
     measure_memory: bool = True
     extra_imports: list[str] = field(default_factory=list)
+    timing_basis: str = "total"
     models: dict[str, ty.Any] = field(default_factory=dict)
 
 
