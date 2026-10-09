@@ -173,8 +173,13 @@ def print_system_info(system_info: dict):
 
 
 def _print_device_results(
-    model_results: pd.Series | pd.DataFrame, model: str, device: str, custom_metric_keys: Sequence[str]
+    model_results: pd.Series | pd.DataFrame,
+    model: str,
+    device: str,
+    custom_metric_keys: Sequence[str],
+    timing_basis: str = "total",
 ):
+    time_column = f"time_{timing_basis}_batch_normalized"
     # Create a rich table for each model+device combination
     table = Table(
         title=f"Model: {model} on Device: {device}",
@@ -226,8 +231,8 @@ def _print_device_results(
                 )
             else:
                 print_result[column] = print_result[column].apply(lambda x: f"{format_num(x, bytes=True)}")
-        elif column == "time_total_batch_normalized":
-            top3 = print_result.time_total_batch_normalized.nsmallest(3).index
+        elif column == time_column:
+            top3 = print_result[column].nsmallest(3).index
             print_result[column] = print_result[column].apply(format_seconds)
             for i, emoji in enumerate(["🥇", "🥈", "🥉"][: len(top3)]):
                 print_result.loc[top3[i], column] = f"{emoji} {print_result.loc[top3[i], column]}"
@@ -247,7 +252,7 @@ def _print_device_results(
             style = "bold blue"
         elif col == "batch_size":
             style = "bold yellow"
-        elif col == "time_total_batch_normalized":
+        elif col == time_column:
             style = "bold cyan"
         elif col.startswith("time"):
             style = None
@@ -269,9 +274,11 @@ def _print_device_results(
     console.print(Panel(table, border_style="dim", padding=(0, 1)))
 
 
-def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: Sequence[str]):
-    default_metric = "time_total_batch_normalized"
-    default_metric_title = "Time Batch Normalized"
+def _print_summary_plot(
+    results: pd.Series | pd.DataFrame, custom_metric_keys: Sequence[str], timing_basis: str = "total"
+):
+    default_metric = f"time_{timing_basis}_batch_normalized"
+    default_metric_title = f"{timing_basis.title()} Time Batch Normalized"
     has_custom_metric = (
         custom_metric_keys
         and custom_metric_keys[0] in results.columns
@@ -355,10 +362,10 @@ def _print_summary_plot(results: pd.Series | pd.DataFrame, custom_metric_keys: S
     console.print(Panel(table, border_style="dim", padding=(0, 1)))
 
 
-def print_results(results: pd.DataFrame, custom_metric_keys: Sequence[str] = ()):
+def print_results(results: pd.DataFrame, custom_metric_keys: Sequence[str] = (), timing_basis: str = "total"):
     for model in results.model.unique():
         model_results = results[results.model == model]
         for device in model_results.device.unique():
-            _print_device_results(model_results, model, device, custom_metric_keys)
+            _print_device_results(model_results, model, device, custom_metric_keys, timing_basis)
 
-    _print_summary_plot(results, custom_metric_keys)
+    _print_summary_plot(results, custom_metric_keys, timing_basis)

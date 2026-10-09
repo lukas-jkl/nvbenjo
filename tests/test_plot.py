@@ -88,9 +88,9 @@ def test_print_results_custom_metric_missing_for_some_runs(mock_console):
     )
     # m2 has no custom_accuracy values → summary table should use default metric entirely, not mix
     print_results(results, custom_metric_keys=["custom_accuracy"])
-    # Verify the summary table uses "Time Batch Normalized" as the column header, not "custom_accuracy"
+    # Verify the summary table uses "Total Time Batch Normalized" as the column header, not "custom_accuracy"
     summary_call = mock_console.print.call_args_list[-1]
     panel = summary_call[0][0]
     column_headers = [col.header for col in panel.renderable.columns]
-    assert "Time Batch Normalized" in column_headers
+    assert "Total Time Batch Normalized" in column_headers
     assert "custom_accuracy" not in column_headers

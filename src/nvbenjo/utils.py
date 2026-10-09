@@ -199,7 +199,9 @@ def get_rnd_from_shape_s(
     return rnd_input, set_individual_types
 
 
-def calculate_batchmetrics(results: pd.DataFrame, custom_batchmetrics: dict[str, float]) -> pd.DataFrame:
+def calculate_batchmetrics(
+    results: pd.DataFrame, custom_batchmetrics: dict[str, float], timing_basis: str = "total"
+) -> pd.DataFrame:
     """Calculate custom batch metrics and add them to the results DataFrame.
 
     Parameters
@@ -208,6 +210,9 @@ def calculate_batchmetrics(results: pd.DataFrame, custom_batchmetrics: dict[str,
         The benchmark results DataFrame.
     custom_batchmetrics : dict[str, float]
         Dictionary of custom batch metrics to calculate. The key is the metric name and the value is the multiplier.
+    timing_basis : str, optional
+        Which batch-normalized time the metrics are divided by: 'total' (including data transfer
+        to and from the device) or 'inference' (device time only), by default 'total'
 
     Returns
     -------
@@ -215,7 +220,7 @@ def calculate_batchmetrics(results: pd.DataFrame, custom_batchmetrics: dict[str,
         The updated results DataFrame with custom batch metrics added.
     """
     for metric_name, value in custom_batchmetrics.items():
-        results[metric_name] = value / results["time_total_batch_normalized"]
+        results[metric_name] = value / results[f"time_{timing_basis}_batch_normalized"]
     return results
 
 
